@@ -858,7 +858,7 @@ sub printUsage{
     my $exit = shift;
     
     print STDOUT
-"USAGE: ChromosomeDrawer.pl -gff chromosome.gff3 -ty 'match=all' -o Chromosome
+"USAGE: DensityMap.pl -gff chromosome.gff3 -ty 'match=all' -o Chromosome
     
 Options:
     -g   | gff string                  Gff file (version gff3 only !)          			(Mandatory)
