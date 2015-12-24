@@ -110,10 +110,10 @@ if    ($config{auto_scale_factor})          {$scale_factor = 1;}
 elsif (!exists $config{scale_factor})       {$scale_factor = 1000;}
 else                                        {$scale_factor = $config{scale_factor};}
 
-if (!exists $config{lmargin})               {$margin{l} = 100;}
+if (!exists $config{lmargin})               {$margin{l} = 50;}
 else                                        {$margin{l} = $config{lmargin};}
 
-if (!exists $config{rmargin})               {$margin{r} = 100;}
+if (!exists $config{rmargin})               {$margin{r} = 50;}
 else                                        {$margin{r} = $config{rmargin};}
 
 if (!exists $config{tmargin})               {$margin{t} = 75;}
@@ -886,8 +886,8 @@ Graphical options:
     -w   | win_size int                Height of window in pixel       (Default = 1)
     -sh  | show_scale int              Draw Scale, n = num max ticks   (Default = 50)
     -st  | strand_width int            Strand width in pixel           (Default = 50)
-    -lm  | lmargin int                 Left margin in pixel            (Default = 100)
-    -rm  | rmargin int                 Rigth margin in pixel           (Default = 100)
+    -lm  | lmargin int                 Left margin in pixel            (Default = 50)
+    -rm  | rmargin int                 Rigth margin in pixel           (Default = 50)
     -tm  | tmargin int                 Top margin in pixel             (Default = 75)
     -bm  | bmargin int                 Bottom margin in pixel          (Default = 50)
     -sp  | space_between_str int       Space between strands in pixel  (Default = 50)
