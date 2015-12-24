@@ -216,7 +216,7 @@ my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 # 3 Loading colors from colors.txt
 print "Load colors ...\n" if $config{'verbose'};
-open(COLOR, "</usr/local/share/DensityMap/colors.txt") or die "Can not open color.txt";
+open(COLOR, "<./colors.txt") or die "Can not open color.txt";
 while (<COLOR>) {
     next if /^#/;
     /([\d\w]+);(\d+);(\d+);(\d+)/;
