@@ -43,7 +43,7 @@ GetOptions (\%config,
             'verbose',
             'debug',
             'insaneDebugMode',
-            'heatmap=i');
+            'colour_scheme=i');
 
 
 ##> Print USAGE if --help
@@ -70,7 +70,7 @@ my $space_between_str;
 my $label_strand_rotation;
 my $picHeight;
 my $picWidth;
-my $heatmap;
+my $colour_scheme;
 my $count = 0;
 my $win_size;
 my $rounding_method;
@@ -125,8 +125,8 @@ else                                        {$margin{b} = $config{bmargin};}
 if (!exists $config{label_strand_rotation}) {$label_strand_rotation = 0;}
 else                                        {$label_strand_rotation = $config{label_strand_rotation};}
 
-if (!exists $config{heatmap})               {$heatmap = 7;}
-else                                        {$heatmap = $config{heatmap};}
+if (!exists $config{colour_scheme})               {$colour_scheme = 7;}
+else                                        {$colour_scheme = $config{colour_scheme};}
 
 if (!exists $config{win_size})              {$win_size = 1;}
 else                                        {$win_size = $config{win_size};}
@@ -172,6 +172,7 @@ if ($config{auto_scale_factor}) {
         last if ($picHeight < $config{auto_scale_factor});
         $scale_factor *= 10;
     }
+    print "Selected Scale Factor = $scale_factor\n";
 }
 else{
     $picHeight = $margin{'t'}
@@ -197,7 +198,9 @@ foreach (split(/;/, $config{'type_to_draw'})){
 $margin{'l'} = $margin{'l'} + $scaleAddWidth if ($config{show_scale});
 $picWidth = $margin{'l'}
           + $margin{'r'}
-          + (($numOfGff * $numOfStrand) * ($strand_width + $space_between_str));
+          #+ (($numOfGff * $numOfStrand) * ($strand_width + $space_between_str));
+          + (($numOfGff * $numOfStrand    ) * $strand_width)
+          + (($numOfGff * $numOfStrand - 1) * $space_between_str);
 
 ## 1.3 Ask if image size is OK
 if (! $config{yes}) {
@@ -440,7 +443,7 @@ foreach my $file (split(/;/, $config{'gff'})){
                 print "strand = $strand\n"      if $config{'debug'};
                 
                 my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-                drawPixels(\$image, \%rand, \$heatmap, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);
+                drawPixels(\$image, \%rand, \$colour_scheme, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);
                 
             }
         }
@@ -677,7 +680,7 @@ sub drawPixels{
     # Input :
     #   - $ref_img      ->  ref of the image
     #   - $ref_rand     ->  ref on the hash of random numbers
-    #   - $ref_heatmap  ->  heatmap to use for colors
+    #   - $ref_colour_scheme  ->  colour_scheme to use for colors
     #   - $chr_size     ->  Chromosome/Sequence size
     #   - $scaleFactor  ->  Scale_factor
     #   - $type         ->  current to draw (label)
@@ -688,7 +691,7 @@ sub drawPixels{
     
     print "Start Drawing pixels ...\n" if $config{'verbose'};
     
-    my ($ref_img, $ref_rand, $ref_heatmap, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
+    my ($ref_img, $ref_rand, $ref_colour_scheme, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
     my %strand2color;
@@ -704,9 +707,9 @@ sub drawPixels{
     }
     
     # Set colors for each strands
-    $strand2color{'+'}  = $$ref_heatmap;
-    $strand2color{'-'}  = $$ref_heatmap;
-    $strand2color{'-+'} = $$ref_heatmap;
+    $strand2color{'+'}  = $$ref_colour_scheme;
+    $strand2color{'-'}  = $$ref_colour_scheme;
+    $strand2color{'-+'} = $$ref_colour_scheme;
     
     print "\tchr_size    = $chr_size\n"       if $config{'debug'};
     print "\tscaleFactor = $scaleFactor\n"    if $config{'debug'};
@@ -869,14 +872,14 @@ Options:
                                        Strand:  - -        -> strand -
                                                 - +        -> strand +
                                                 - both     -> strand - and strand +
-                                                - fused    -> Combinaison of strand - and strand +
+                                                - fused    -> Combination of strand - and strand +
                                                 - all      -> strand - and strand + and fused
                                        Format: \"match=all;gene=both;CDS=fused\"
     -v   | verbose                     MORE text dude !!!!
     -hel | help                        This help
 
 Density options: 
-    -hea | heatmap int                 Heatmap to use 		       (Default = 7)
+    -c   | coulour_scheme int          color scheme to use 		       (Default = 7)
     -sc  | scale_factor int            = window length in bp           (Default = 1000)
     -a   | auto_scale_factor int       Max picture height in pixel
     -ro  | rounding_method string      floor or ceil		       (Default = floor)
