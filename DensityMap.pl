@@ -23,7 +23,6 @@ GetOptions (\%config,
             'gff=s',
             'type_to_draw=s', 
             'output_img_name=s',
-            'chr_width=i',
             'rounding_method=s',
             'show_scale=i',
             'strand_width=i',
@@ -116,7 +115,7 @@ else                                        {$margin{l} = $config{lmargin};}
 if (!exists $config{rmargin})               {$margin{r} = 50;}
 else                                        {$margin{r} = $config{rmargin};}
 
-if (!exists $config{tmargin})               {$margin{t} = 75;}
+if (!exists $config{tmargin})               {$margin{t} = 50;}
 else                                        {$margin{t} = $config{tmargin};}
 
 if (!exists $config{bmargin})               {$margin{b} = 50;}
@@ -125,7 +124,7 @@ else                                        {$margin{b} = $config{bmargin};}
 if (!exists $config{label_strand_rotation}) {$label_strand_rotation = 0;}
 else                                        {$label_strand_rotation = $config{label_strand_rotation};}
 
-if (!exists $config{colour_scheme})               {$colour_scheme = 7;}
+if (!exists $config{colour_scheme})         {$colour_scheme = 7;}
 else                                        {$colour_scheme = $config{colour_scheme};}
 
 if (!exists $config{win_size})              {$win_size = 1;}
@@ -217,9 +216,9 @@ print "Create Picture ...\n" if $config{'verbose'};
 my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 
-# 3 Loading colors from colors.txt
-print "Load colors ...\n" if $config{'verbose'};
-open(COLOR, "<./colors.txt") or die "Can not open color.txt";
+# 3 Loading colors from colours.txt
+print "Load colours ...\n" if $config{'verbose'};
+open(COLOR, "<./colours.txt") or die "Can not open color.txt";
 while (<COLOR>) {
     next if /^#/;
     /([\d\w]+);(\d+);(\d+);(\d+)/;
@@ -297,6 +296,7 @@ foreach my $file (split(/;/, $config{'gff'})){
     
     my $boolOK = 1;
     
+    # clean intervals sets
     foreach (keys(%gffTypes)){
         $gffTypes{$_}{'-'}  = [];
         $gffTypes{$_}{'+'}  = [];
@@ -313,8 +313,8 @@ foreach my $file (split(/;/, $config{'gff'})){
         if ($line[2] eq "centromere") {
             $centromere{start} = $line[3];
             $centromere{end}   = $line[4];
-            print "START ========> $centromere{start}\n";
-            print "END\  ========> $centromere{end}\n";
+            #print "START ========> $centromere{start}\n";
+            #print "END\  ========> $centromere{end}\n";
             next;
         }
         
@@ -455,7 +455,7 @@ foreach my $file (split(/;/, $config{'gff'})){
 open(IMG, ">$config{output_img_name}.svg") or die "Can not open $config{output_img_name} ! ";
 binmode IMG;
 my @text = split("\t", $image->svg);
-if (!$config{transparency}) {
+#if (!$config{transparency}) {
     my $switchRotate = 0;
     foreach (@text){
         if    ($config{label_strand_rotation} and /<g id="rotate_\d+">/)    {$switchRotate++;}
@@ -473,7 +473,7 @@ if (!$config{transparency}) {
         s/;? " width/" width/g;
         print IMG $_;
     }    
-}
+#}
 
 #WAS USED FOR ADDING TRANSPARENCY ON MERGED TRACKS
 #else {
@@ -879,7 +879,7 @@ Options:
     -hel | help                        This help
 
 Density options: 
-    -c   | coulour_scheme int          color scheme to use 		       (Default = 7)
+    -c   | coulour_scheme int          color scheme to use 	       (Default = 7)
     -sc  | scale_factor int            = window length in bp           (Default = 1000)
     -a   | auto_scale_factor int       Max picture height in pixel
     -ro  | rounding_method string      floor or ceil		       (Default = floor)
@@ -891,7 +891,7 @@ Graphical options:
     -st  | strand_width int            Strand width in pixel           (Default = 50)
     -lm  | lmargin int                 Left margin in pixel            (Default = 50)
     -rm  | rmargin int                 Rigth margin in pixel           (Default = 50)
-    -tm  | tmargin int                 Top margin in pixel             (Default = 75)
+    -tm  | tmargin int                 Top margin in pixel             (Default = 50)
     -bm  | bmargin int                 Bottom margin in pixel          (Default = 50)
     -sp  | space_between_str int       Space between strands in pixel  (Default = 50)
     -ba  | background color            Fill Background                 (Default = no Background)
