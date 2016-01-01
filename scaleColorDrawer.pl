@@ -41,7 +41,7 @@ my $width;
 $| = 1;
 ##> Setting parameters
 
-open(COLOR, "<colors.txt") or die printError("Cannot open colors.txt ! \n", 1);
+open(COLOR, "<colours.txt") or die printError("Cannot open colours.txt ! \n", 1);
 while (<COLOR>) {
     next if !(/heatmap/);
     /(\d+)_heatmap(\d+);(\d+);(\d+);(\d+)/;

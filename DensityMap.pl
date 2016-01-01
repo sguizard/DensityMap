@@ -42,7 +42,7 @@ GetOptions (\%config,
             'verbose',
             'debug',
             'insaneDebugMode',
-            'colour_scheme=i');
+            'colour_scale=i');
 
 
 ##> Print USAGE if --help
@@ -69,7 +69,7 @@ my $space_between_str;
 my $label_strand_rotation;
 my $picHeight;
 my $picWidth;
-my $colour_scheme;
+my $colour_scale;
 my $count = 0;
 my $win_size;
 my $rounding_method;
@@ -124,8 +124,8 @@ else                                        {$margin{b} = $config{bmargin};}
 if (!exists $config{label_strand_rotation}) {$label_strand_rotation = 0;}
 else                                        {$label_strand_rotation = $config{label_strand_rotation};}
 
-if (!exists $config{colour_scheme})         {$colour_scheme = 7;}
-else                                        {$colour_scheme = $config{colour_scheme};}
+if (!exists $config{colour_scale})         {$colour_scale = 7;}
+else                                        {$colour_scale = $config{colour_scale};}
 
 if (!exists $config{win_size})              {$win_size = 1;}
 else                                        {$win_size = $config{win_size};}
@@ -218,7 +218,7 @@ my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 # 3 Loading colors from colours.txt
 print "Load colours ...\n" if $config{'verbose'};
-open(COLOR, "<./colours.txt") or die "Can not open color.txt";
+open(COLOR, "<./colours.txt") or die "Can not open colours.txt";
 while (<COLOR>) {
     next if /^#/;
     /([\d\w]+);(\d+);(\d+);(\d+)/;
@@ -443,7 +443,7 @@ foreach my $file (split(/;/, $config{'gff'})){
                 print "strand = $strand\n"      if $config{'debug'};
                 
                 my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-                drawPixels(\$image, \%rand, \$colour_scheme, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);
+                drawPixels(\$image, \%rand, \$colour_scale, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);
                 
             }
         }
@@ -680,7 +680,7 @@ sub drawPixels{
     # Input :
     #   - $ref_img      ->  ref of the image
     #   - $ref_rand     ->  ref on the hash of random numbers
-    #   - $ref_colour_scheme  ->  colour_scheme to use for colors
+    #   - $ref_colour_scale  ->  colour_scale to use for colors
     #   - $chr_size     ->  Chromosome/Sequence size
     #   - $scaleFactor  ->  Scale_factor
     #   - $type         ->  current to draw (label)
@@ -691,7 +691,7 @@ sub drawPixels{
     
     print "Start Drawing pixels ...\n" if $config{'verbose'};
     
-    my ($ref_img, $ref_rand, $ref_colour_scheme, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
+    my ($ref_img, $ref_rand, $ref_colour_scale, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
     my %strand2color;
@@ -707,9 +707,9 @@ sub drawPixels{
     }
     
     # Set colors for each strands
-    $strand2color{'+'}  = $$ref_colour_scheme;
-    $strand2color{'-'}  = $$ref_colour_scheme;
-    $strand2color{'-+'} = $$ref_colour_scheme;
+    $strand2color{'+'}  = $$ref_colour_scale;
+    $strand2color{'-'}  = $$ref_colour_scale;
+    $strand2color{'-+'} = $$ref_colour_scale;
     
     print "\tchr_size    = $chr_size\n"       if $config{'debug'};
     print "\tscaleFactor = $scaleFactor\n"    if $config{'debug'};
