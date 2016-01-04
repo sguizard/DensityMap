@@ -38,11 +38,12 @@ GetOptions (\%config,
             'label_strand_rotation=i',
             'title=s',
             'yes',
-            'win_size=f',
+            'win_size=i',
             'verbose',
             'debug',
             'insaneDebugMode',
-            'colour_scale=i');
+            'colour_scale=i',
+			'gc=i');
 
 
 ##> Print USAGE if --help
@@ -73,6 +74,7 @@ my $colour_scale;
 my $count = 0;
 my $win_size;
 my $rounding_method;
+my $gc_cs;
 
 my %color;
 my %gffTypes;
@@ -124,8 +126,11 @@ else                                        {$margin{b} = $config{bmargin};}
 if (!exists $config{label_strand_rotation}) {$label_strand_rotation = 0;}
 else                                        {$label_strand_rotation = $config{label_strand_rotation};}
 
-if (!exists $config{colour_scale})         {$colour_scale = 7;}
+if (!exists $config{colour_scale})          {$colour_scale = 7;}
 else                                        {$colour_scale = $config{colour_scale};}
+
+if (!exists $config{gc})          			{$gc_cs = 7;}
+else                                        {$gc_cs = $config{gc};}
 
 if (!exists $config{win_size})              {$win_size = 1;}
 else                                        {$win_size = $config{win_size};}
@@ -201,6 +206,11 @@ $picWidth = $margin{'l'}
           + (($numOfGff * $numOfStrand    ) * $strand_width)
           + (($numOfGff * $numOfStrand - 1) * $space_between_str);
 
+if ($config{gc}){
+	$picWidth += (($numOfGff * $numOfStrand) * $strand_width) 
+			  +  (($numOfGff * $numOfStrand) * $space_between_str);
+}
+
 ## 1.3 Ask if image size is OK
 if (! $config{yes}) {
     while (1) {
@@ -260,10 +270,12 @@ if ($config{show_scale}) {
 
 # 6 Get Type/Strand
 foreach (split(/;/, $config{'type_to_draw'})){
-    $_=~ /([^=]+)=([^=]+)/;
+    $_=~ /([^=]+)=([^=]+)=?(\d?)/;
 
     print "type = $1\tstrand = $2\n" if $config{debug};
-
+	
+	if ($3) {$gffTypes{$1}{colour} = $3;}
+	else    {$gffTypes{$1}{colour} = $colour_scale;}
     $gffTypes{$1}{strand} = $2;
     $gffTypes{$1}{'-'}  = [];
     $gffTypes{$1}{'+'}  = [];
@@ -304,35 +316,43 @@ foreach my $file (split(/;/, $config{'gff'})){
     }
     
     my %centromere;
-    
+    my $switchFasta = 0;
+    my $sequence;
+
     while (<GFF>) {
+		next if /^>/;
+		$switchFasta++  if (/##FASTA/);
+		$sequence .= $_ if $switchFasta;
+
         next if $_ !~ /$paternType/;
         chomp;
         my @line = split(/\t/);
         
-        if ($line[2] eq "centromere") {
-            $centromere{start} = $line[3];
-            $centromere{end}   = $line[4];
-            #print "START ========> $centromere{start}\n";
-            #print "END\  ========> $centromere{end}\n";
-            next;
-        }
-        
-        my $ref_tabM =  $gffTypes{$line[2]}{'-'};
-        my $ref_tabP =  $gffTypes{$line[2]}{'+'};
-        my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
-        
-        if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
-        elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
-                                 push(@{$ref_tabMP}, [$line[3], $line[4]]);
-        
-        #print $_."\n" if (!defined($line[3]) or !defined($line[4]) or !defined($line[6]));
-        #$gffTab[line][0] = $line[3]; # gff start
-        #$gffTab[line][1] = $line[4]; # gff end
-        #$gffTab[line][2] = $line[6]; # gff strand
+		if (!$switchFasta){
+        	if ($line[2] eq "centromere") {
+            	$centromere{start} = $line[3];
+            	$centromere{end}   = $line[4];
+            	#print "START ========> $centromere{start}\n";
+            	#print "END\  ========> $centromere{end}\n";
+            	next;
+			}
+		
+        	my $ref_tabM =  $gffTypes{$line[2]}{'-'};
+        	my $ref_tabP =  $gffTypes{$line[2]}{'+'};
+        	my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
+        	
+        	if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
+        	elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
+        	                         push(@{$ref_tabMP}, [$line[3], $line[4]]);
+        	
+        	#print $_."\n" if (!defined($line[3]) or !defined($line[4]) or !defined($line[6]));
+        	#$gffTab[line][0] = $line[3]; # gff start
+        	#$gffTab[line][1] = $line[4]; # gff end
+        	#$gffTab[line][2] = $line[6]; # gff strand
+		}
     }
     close GFF;
-    
+	
     # 7.2 Sorting intervals
     foreach (keys(%gffTypes)){
         my $ref_tabM =  $gffTypes{$_}{'-'};
@@ -352,7 +372,6 @@ foreach my $file (split(/;/, $config{'gff'})){
     }
     
     # 7.4 Set Offset
-    #foreach (keys(%gffTypes)){
     foreach (@type_array){
         if ($gffTypes{$_}{'strand'} eq "-")     {
             $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
@@ -389,8 +408,8 @@ foreach my $file (split(/;/, $config{'gff'})){
             $offset{$_}{'-+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "f = $offset{$_}{'f'}{'x'}\n" if $config{debug};
-            print "f = $offset{$_}{'f'}{'y'}\n" if $config{debug};
+            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
+            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
         }
         if ($gffTypes{$_}{'strand'} eq "all")   {
             $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
@@ -411,43 +430,33 @@ foreach my $file (split(/;/, $config{'gff'})){
             print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
             print "+ = $offset{$_}{'+'}{'x'}\n"  if $config{debug};
             print "+ = $offset{$_}{'+'}{'y'}\n"  if $config{debug};
-        }  
+        }
     }
+	
+	if ($config{gc}){
+		$offset{'gc'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+		$offset{'gc'}{'y'} = $margin{'t'};
+		$count++;
+	}  
     
     # 7.5 Foearch type draw strands
-    #foreach my $typeToDraw (keys(%gffTypes)){
-        
-        #WAS USED FOR MERGING + AND - TRACK AND THEN ADDING TRANSPARENCY ON THE MERGED TRACKS
-        #print "typeToDraw = $typeToDraw\n"  if $config{'debug'};
-        #
-        #foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
-        #    print "strand = $strand\n"      if $config{'debug'};
-        #    
-        #    if ($strand ne "-+") {
-        #        my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-        #        drawPixels(\$image, \%rand, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, $ref_tab);
-        #    }
-        #    elsif ($strand eq "-+"){
-        #        my $ref_tab = $gffTypes{$typeToDraw}{"-"};
-        #        drawPixels(\$image, \%rand, $chr_length, $scale_factor, $typeToDraw, $strand, "-", $ref_tab);
-        #        
-        #        $ref_tab = $gffTypes{$typeToDraw}{"+"};
-        #        drawPixels(\$image, \%rand, $chr_length, $scale_factor, $typeToDraw, $strand, "+", $ref_tab);
-        #    }
-        #}
-        
-        foreach my $typeToDraw (@type_array){
-            print "typeToDraw = $typeToDraw\n"  if $config{'debug'};
+	 
+    foreach my $typeToDraw (@type_array){
+    	print "typeToDraw = $typeToDraw\n" if $config{'debug'};
+
+    	foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
+    		print "strand = $strand\n" if $config{'debug'};
             
-            foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
-                print "strand = $strand\n"      if $config{'debug'};
-                
-                my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-                drawPixels(\$image, \%rand, \$colour_scale, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);
-                
-            }
+    		my $ref_tab = $gffTypes{$typeToDraw}{$strand};
+			my $cs = $gffTypes{$typeToDraw}{colour};
+
+    		drawPixels(\$image, \%rand, $cs, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);        
         }
-    #}   
+	}
+
+    if ($config{gc}){
+			drawPixelsGC(\$image, \%rand, $gc_cs, $seqName, $chr_length, $scale_factor, $win_size, \$sequence);
+	}
 } # END 7
 
 
@@ -691,10 +700,9 @@ sub drawPixels{
     
     print "Start Drawing pixels ...\n" if $config{'verbose'};
     
-    my ($ref_img, $ref_rand, $ref_colour_scale, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
+    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
-    my %strand2color;
     my $randNum;
     my %intervals;
     my @previousBases = (0);
@@ -705,11 +713,6 @@ sub drawPixels{
         redo if $$ref_rand{$randNum}++;
         last;
     }
-    
-    # Set colors for each strands
-    $strand2color{'+'}  = $$ref_colour_scale;
-    $strand2color{'-'}  = $$ref_colour_scale;
-    $strand2color{'-+'} = $$ref_colour_scale;
     
     print "\tchr_size    = $chr_size\n"       if $config{'debug'};
     print "\tscaleFactor = $scaleFactor\n"    if $config{'debug'};
@@ -775,20 +778,20 @@ sub drawPixels{
                 
             }# feature end is on next pixels
             
-            print "\tbasesCoverred = $basesCoverred\n"      if $config{'debug'};
+            print "\tbasesCoverred = $basesCoverred\n" if $config{'debug'};
             
         }# while ($intervalsTabM[0]->[0] < ($pos * $scaleFactor))
         
-        print "Stop while\n"                                if $config{'debug'};
+        print "Stop while\n" if $config{'debug'};
         
         # Compute percentage of base coverage
         my $percentage;
         if    ($rounding_method eq "floor") {$percentage = floor(($basesCoverred/$scaleFactor) * 100);}
         elsif ($rounding_method eq "ceil" ) {$percentage = ceil (($basesCoverred/$scaleFactor) * 100);}
         
-        print "percentage = $basesCoverred/$scaleFactor = ".($basesCoverred/$scaleFactor)."\n"  if $config{'debug'};
-        print "percentage = $percentage % \n\n"             if $config{'debug'};
-        print "$pos = $strand2color{$strand}_heatmap$percentage\n" if $config{insaneDebugMode};
+        print "percentage = $basesCoverred/$scaleFactor = ".($basesCoverred/$scaleFactor)."\n" if $config{'debug'};
+        print "percentage = $percentage % \n\n"   if $config{'debug'};
+        print "$pos = ${cs}_heatmap$percentage\n" if $config{insaneDebugMode};
         
         # kill if more than 100 % 
         if ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
@@ -796,7 +799,7 @@ sub drawPixels{
         # Draw the current pixel
         $$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                    $offset{$type}{$strand}{'y'} + $pos * $win_size,
                                    $offset{$type}{$strand}{'x'} + $strand_width,    $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
-                                   $color{"$strand2color{$strandColor}_heatmap$percentage"});
+                                   $color{"${cs}_heatmap$percentage"});
     }# End # For each pixel of the chromosome/sequence
     
     # Draw Centromere
@@ -848,6 +851,92 @@ sub drawPixels{
 }
 
 ###########################################################################
+sub drawPixelsGC{
+    
+    # Draw each pixel of strand
+    # Input :
+    #   - $ref_img      ->  ref of the image
+    #   - $ref_rand     ->  ref on the hash of random numbers
+    #   - $cs           ->  colour_scale to use for colors
+	#	- $seqName		->	Name of the annotated sequence
+    #   - $chr_size     ->  Chromosome/Sequence size
+    #   - $scaleFactor  ->  Scale_factor
+	#	- $win_size		->	Size of the printed window in pixel
+	#	- $ref_sequence	->	sequence of the chromosome
+    # Ouput : none
+    
+    print "Start Drawing pixels GC ...\n" if $config{'verbose'};
+    
+    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $win_size, $ref_sequence) = @_;
+    my $randNum;
+    
+    # Search a unique random number
+    while (1) {
+        $randNum = int rand(1000);
+        redo if $$ref_rand{$randNum}++;
+        last;
+    }
+    
+    print "\tchr_size    = $chr_size\n"       if $config{'debug'};
+    print "\tscaleFactor = $scaleFactor\n"    if $config{'debug'};
+    
+    # Open chromosome/sequence group
+    $$ref_img->startGroup("+-_${randNum}");
+    
+    # For each pixel of the chromosome/sequence
+    for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
+		#Get next window sequence
+		my $win_seq = substr $$ref_sequence, 0, $scaleFactor, '';
+
+		#Count GC bases
+		my $gcBases = $win_seq =~ tr/GC//;
+
+        # Compute percentage of base coverage
+        my $percentage;
+        if    ($rounding_method eq "floor") {$percentage = floor(($gcBases/$scaleFactor) * 100);}
+        elsif ($rounding_method eq "ceil" ) {$percentage = ceil (($gcBases/$scaleFactor) * 100);}
+        
+        # kill if more than 100 % 
+        if ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
+        
+        # Draw the current pixel
+        $$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $pos * $win_size,
+                                   $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $pos * $win_size + $win_size,
+                                   $color{"${cs}_heatmap$percentage"});
+    }# End # For each pixel of the chromosome/sequence
+    
+    # Open label group for next rotation 
+    $$ref_img->startGroup("rotate_$randNum");
+    
+    # Draw label Sequence Name
+    $$ref_img->string(gdLargeFont,
+                   $offset{gc}{'x'}, 
+                   $offset{gc}{'y'} - (3.5 * gdLargeFont->height), 
+                   $seqName,
+                   $color{'black'});
+    
+    # Draw label type
+    $$ref_img->string(gdLargeFont,
+                   $offset{gc}{'x'}, 
+                   $offset{gc}{'y'} - (2 * gdLargeFont->height), 
+                   "GC%",
+                   $color{'black'});
+    # Close label group for next rotation
+    $$ref_img->endGroup;
+    
+    # Draw strand label
+    $$ref_img->string(gdLargeFont,
+                   $offset{gc}{'x'}, 
+                   $offset{gc}{'y'} - gdLargeFont->height, 
+                   "+-",
+                   $color{'black'});
+    
+    # close chromosome/sequence group
+    $$ref_img->endGroup;
+    print "Finish Drawing pixels.\n" if $config{'verbose'};
+}
+
+###########################################################################
 sub printError{
     my $string = shift;
     my $exit = shift;
@@ -883,6 +972,7 @@ Density options:
     -sc  | scale_factor int            = window length in bp           (Default = 1000)
     -a   | auto_scale_factor int       Max picture height in pixel
     -ro  | rounding_method string      floor or ceil		       (Default = floor)
+    -gc  | gc integer                  if set, add a density map of the GC%
 
 Graphical options: 
     -ti  | title string                Title to print on the picture
