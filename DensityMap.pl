@@ -211,8 +211,8 @@ $picWidth = $margin{'l'}
           + (($numOfGff * $numOfStrand - 1) * $space_between_str);
 
 if ($config{gc}){
-	$picWidth += (($numOfGff * $numOfStrand) * $strand_width) 
-			  +  (($numOfGff * $numOfStrand) * $space_between_str);
+	$picWidth += ($numOfGff * $strand_width) 
+			  +  ($numOfGff * $space_between_str);
 }
 
 ## 1.3 Ask if image size is OK
@@ -332,9 +332,8 @@ foreach my $file (split(/;/, $config{'gff'})){
         chomp;
         my @line = split(/\t/);
 	
-        next if $line[2] !~ /$paternType/;
-        
 		if (!$switchFasta){
+        	next if $line[2] !~ /$paternType/;
 			
         	if ($line[2] eq "centromere") {
             	$centromere{start} = $line[3];
