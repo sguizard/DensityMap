@@ -37,13 +37,15 @@ GetOptions (\%config,
             'bmargin=i',
             'label_strand_rotation=i',
             'title=s',
-            'yes',
+            'force',
             'win_size=i',
             'verbose',
             'debug',
             'insaneDebugMode',
             'colour_scale=i',
-			'gc=i');
+            'gc=i',
+            'font=s',
+            'font-size=i');
 
 
 ##> Print USAGE if --help
@@ -58,7 +60,7 @@ if (!exists $config{gff} or
 #if (! -e $config{gff})                  {printError ("gff $config{gff} not exist ! \n"); printUsage(1);}
 
 ##> Setting Global Variables
-my $paternType;
+my $paternType = "(";
 my $scaleAddWidth = 100; 
 my $numMaxTicks;
 my $numTicks;
@@ -75,6 +77,8 @@ my $count = 0;
 my $win_size;
 my $rounding_method;
 my $gc_cs;
+my $font;
+my $fontSize = 16; 
 
 my %color;
 my %gffTypes;
@@ -212,7 +216,7 @@ if ($config{gc}){
 }
 
 ## 1.3 Ask if image size is OK
-if (! $config{yes}) {
+if (!$config{force}) {
     while (1) {
         print "Is the picture size will be ok ? ($picWidth px x $picHeight px) [y/n] : ";
         chomp (my $response = <STDIN>);
@@ -270,7 +274,7 @@ if ($config{show_scale}) {
 
 # 6 Get Type/Strand
 foreach (split(/;/, $config{'type_to_draw'})){
-    $_=~ /([^=]+)=([^=]+)=?(\d?)/;
+    $_=~ /([^=]+)=([^=]+)=?(\d*)/;
 
     print "type = $1\tstrand = $2\n" if $config{debug};
 	
@@ -281,10 +285,10 @@ foreach (split(/;/, $config{'type_to_draw'})){
     $gffTypes{$1}{'+'}  = [];
     $gffTypes{$1}{'-+'} = [];
 
-    $paternType .= '\t'.$1.'\t|';
+    $paternType .= $1.'|';
 }
 #$paternType =~ s/\|$//g;
-$paternType .= 'centromere';
+$paternType .= 'centromere)';
 print "Patern Regexp = $paternType\n" if $config{debug};
 
 
@@ -323,20 +327,21 @@ foreach my $file (split(/;/, $config{'gff'})){
 		next if /^>/;
 		$switchFasta++  if (/##FASTA/);
 		$sequence .= $_ if $switchFasta;
+		next if /^#/;
 
-        next if $_ !~ /$paternType/;
         chomp;
         my @line = split(/\t/);
+	
+        next if $line[2] !~ /$paternType/;
         
 		if (!$switchFasta){
+			
         	if ($line[2] eq "centromere") {
             	$centromere{start} = $line[3];
             	$centromere{end}   = $line[4];
-            	#print "START ========> $centromere{start}\n";
-            	#print "END\  ========> $centromere{end}\n";
             	next;
 			}
-		
+			
         	my $ref_tabM =  $gffTypes{$line[2]}{'-'};
         	my $ref_tabP =  $gffTypes{$line[2]}{'+'};
         	my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
@@ -344,18 +349,14 @@ foreach my $file (split(/;/, $config{'gff'})){
         	if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
         	elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
         	                         push(@{$ref_tabMP}, [$line[3], $line[4]]);
-        	
-        	#print $_."\n" if (!defined($line[3]) or !defined($line[4]) or !defined($line[6]));
-        	#$gffTab[line][0] = $line[3]; # gff start
-        	#$gffTab[line][1] = $line[4]; # gff end
-        	#$gffTab[line][2] = $line[6]; # gff strand
 		}
     }
     close GFF;
 	
     # 7.2 Sorting intervals
     foreach (keys(%gffTypes)){
-        my $ref_tabM =  $gffTypes{$_}{'-'};
+		
+		my $ref_tabM =  $gffTypes{$_}{'-'};
         my $ref_tabP =  $gffTypes{$_}{'+'};
         my $ref_tabMP = $gffTypes{$_}{'-+'};
         
@@ -455,6 +456,7 @@ foreach my $file (split(/;/, $config{'gff'})){
 	}
 
     if ($config{gc}){
+			printError("Fasta sequence is not in the gff file ! ", 1) if (!$switchFasta);
 			drawPixelsGC(\$image, \%rand, $gc_cs, $seqName, $chr_length, $scale_factor, $win_size, \$sequence);
 	}
 } # END 7
@@ -471,7 +473,9 @@ my @text = split("\t", $image->svg);
         elsif ($config{label_strand_rotation} and/<\/g>/ and $switchRotate) {$switchRotate--;}
         
         if ($switchRotate) {s/x="(\d+)" y="(\d+)"/x="$1" y="$2" transform="rotate($label_strand_rotation, $1, $2)"/;}
-        
+		
+        if ($config{font})			   {s/font="Helvetica"/font="$config{font}"/;}
+        if ($config{'font-size'} != 16){s/font-size="16"/font-size="$config{'font-size'}"/;}
         #s/stroke-opacity: 1.0; stroke-width: 1/stroke: none/g;
         #s/stroke-opacity: 1.0;/stroke: none;/g;
         s/stroke-opacity: 1.0;?//g;
@@ -824,14 +828,14 @@ sub drawPixels{
     
     # Draw label Sequence Name
     $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'}, 
-                   $offset{$type}{$strand}{'y'} - (3.5 * gdLargeFont->height), 
+                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+                   $offset{$type}{$strand}{'y'} - (3 * gdLargeFont->height), 
                    $seqName,
                    $color{'black'});
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'}, 
+                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($type) * gdLargeFont->width)/2), 
                    $offset{$type}{$strand}{'y'} - (2 * gdLargeFont->height), 
                    $type,
                    $color{'black'});
@@ -840,7 +844,7 @@ sub drawPixels{
     
     # Draw strand label
     $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'}, 
+                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($strand) * gdLargeFont->width)/2), 
                    $offset{$type}{$strand}{'y'} - gdLargeFont->height, 
                    $strand,
                    $color{'black'});
@@ -910,14 +914,14 @@ sub drawPixelsGC{
     
     # Draw label Sequence Name
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'}, 
-                   $offset{gc}{'y'} - (3.5 * gdLargeFont->height), 
+                   $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+                   $offset{gc}{'y'} - (3 * gdLargeFont->height), 
                    $seqName,
                    $color{'black'});
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'}, 
+                   $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
                    $offset{gc}{'y'} - (2 * gdLargeFont->height), 
                    "GC%",
                    $color{'black'});
@@ -926,7 +930,7 @@ sub drawPixelsGC{
     
     # Draw strand label
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'}, 
+                   $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2),
                    $offset{gc}{'y'} - gdLargeFont->height, 
                    "+-",
                    $color{'black'});
@@ -953,40 +957,47 @@ sub printUsage{
 "USAGE: DensityMap.pl -gff chromosome.gff3 -ty 'match=all' -o Chromosome
     
 Options:
-    -g   | gff string                  Gff file (version gff3 only !)          			(Mandatory)
-                                       Format: file.gff or \"file1.gff;file2.gff\"
-    -o   | output_img_name string      Name of the output image                			(Mandatory)
-    -ty  | type_to_draw string         List of type (column 3 of gff) to draw and strand to use (Mandatory)
-                                       Type: match, gene, CDS, ...
-                                       Strand:  - -        -> strand -
-                                                - +        -> strand +
-                                                - both     -> strand - and strand +
-                                                - fused    -> Combination of strand - and strand +
-                                                - all      -> strand - and strand + and fused
-                                       Format: \"match=all;gene=both;CDS=fused\"
-    -v   | verbose                     MORE text dude !!!!
-    -hel | help                        This help
+    -gf    | gff string                  Gff file (version gff3 only !)          (Mandatory)
+                                         Format: file.gff or \"file1.gff;file2.gff\"
+    -o     | output_img_name string      Name of the output image                (Mandatory)
+    -ty    | type_to_draw string         List of type (column 3 of gff)          (Mandatory)
+                                         to draw, strand to use and color scale
+                                         Type: match, gene, CDS, ...
+                                         Strand: - -        -> strand -
+                                                 - +        -> strand +
+                                                 - both     -> strand - and strand +
+                                                 - fused    -> Combination of strand - and strand +
+                                                 - all      -> strand - and strand + and fused
+                                         Format: \"match=all;gene=both;CDS=fused\" or
+                                                 \"match=all=7;gene=both=7;CDS=fused=10\"
+
+Generic options: 
+    -for   | force                       Automaticaly answer yes to picture size validation
+    -v     | verbose                     MORE text dude !!!!
+    -h     | help                        This help
 
 Density options: 
-    -c   | coulour_scheme int          color scheme to use 	       (Default = 7)
-    -sc  | scale_factor int            = window length in bp           (Default = 1000)
-    -a   | auto_scale_factor int       Max picture height in pixel
-    -ro  | rounding_method string      floor or ceil		       (Default = floor)
-    -gc  | gc integer                  if set, add a density map of the GC%
+    -c     | colour_scale int            color scale to use    (Default = 7)
+    -sc    | scale_factor int            = window length in bp (Default = 1000)
+    -a     | auto_scale_factor int       Max picture height in pixel
+    -ro    | rounding_method string      floor or ceil         (Default = floor)
+    -gc    | gc integer                  if set, add a density map of the GC%
 
 Graphical options: 
-    -ti  | title string                Title to print on the picture
-    -w   | win_size int                Height of window in pixel       (Default = 1)
-    -sh  | show_scale int              Draw Scale, n = num max ticks   (Default = 50)
-    -st  | strand_width int            Strand width in pixel           (Default = 50)
-    -lm  | lmargin int                 Left margin in pixel            (Default = 50)
-    -rm  | rmargin int                 Rigth margin in pixel           (Default = 50)
-    -tm  | tmargin int                 Top margin in pixel             (Default = 50)
-    -bm  | bmargin int                 Bottom margin in pixel          (Default = 50)
-    -sp  | space_between_str int       Space between strands in pixel  (Default = 50)
-    -ba  | background color            Fill Background                 (Default = no Background)
-    -la  | label_strand_rotation int   Rotation degree of strand label (Default = 0)
-
+    -ti    | title string                Title to print on the picture
+    -w     | win_size int                Height of window in pixel       (Default = 1)
+    -sh    | show_scale int              Draw scale, the integer indicate the maximum 
+                                         tick to print on the scale      (Default = 50)
+    -st    | strand_width int            Strand width in pixel           (Default = 50)
+    -lm    | lmargin int                 Left margin in pixel            (Default = 50)
+    -rm    | rmargin int                 Rigth margin in pixel           (Default = 50)
+    -tm    | tmargin int                 Top margin in pixel             (Default = 50)
+    -bm    | bmargin int                 Bottom margin in pixel          (Default = 50)
+    -sp    | space_between_str int       Space between strands in pixel  (Default = 50)
+    -ba    | background color            Fill Background                 (Default = no Background)
+    -la    | label_strand_rotation int   Rotation degree of strand label (Default = 0)
+    -font  | font string                 Font to use for text            (Default = Helvetica)
+    -font- | font-size int               Size of the font                (Default = 16)
 
 
     This program is free software: you can redistribute it and/or modify
