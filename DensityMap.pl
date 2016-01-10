@@ -20,13 +20,14 @@ use POSIX;
 ##> Define options
 my %config;
 GetOptions (\%config,
-            'gff=s',
+            'input=s',
             'type_to_draw=s', 
             'output_img_name=s',
             'rounding_method=s',
             'show_scale=i',
-            'strand_width=i',
-            'space_between_str=i',
+            'str_width=i',
+            'str_space=i',
+            'space_chr=i',
             'scale_factor=i',
             'auto_scale_factor=i',
             'background=s',
@@ -41,11 +42,10 @@ GetOptions (\%config,
             'win_size=i',
             'verbose',
             'debug',
-            'insaneDebugMode',
             'colour_scale=i',
             'gc=i',
-            'font=s',
-            'font-size=i');
+            'ft_family=s',
+            'ft_size=i');
 
 
 ##> Print USAGE if --help
@@ -53,11 +53,11 @@ if ($config{help}) {printUsage(1);}
 
 
 ##> Check if gff file exist, if no mandatory parameter are missing
-if (!exists $config{gff} or
+if (!exists $config{input} or
     !exists $config{output_img_name} or
     !exists $config{type_to_draw})
                                         {printError ("\n!!!!gff, output_img_name, type_to_draw options are MANDATORY !!!!! \n\n\n", 0); printUsage(1);}
-#if (! -e $config{gff})                  {printError ("gff $config{gff} not exist ! \n"); printUsage(1);}
+#if (! -e $config{input})                  {printError ("gff $config{input} not exist ! \n"); printUsage(1);}
 
 ##> Setting Global Variables
 my $paternType = "(";
@@ -68,17 +68,19 @@ my $chr_length;
 my $chr_length_reel;
 my $scale_factor;
 my $strand_width;
-my $space_between_str;
+my $strand_space;
 my $label_strand_rotation;
 my $picHeight;
 my $picWidth;
 my $colour_scale;
 my $count = 0;
+my $countGff = -1;
 my $win_size;
 my $rounding_method;
 my $gc_cs;
 my $font;
-my $fontSize = 16; 
+my $fts = 16; 
+my $space_chr;
 
 my %color;
 my %gffTypes;
@@ -102,14 +104,17 @@ $offset{'y2'} = 0;
 $| = 1;
 
 
-if (!exists $config{strand_width})          {$strand_width = 50;}
-else                                        {$strand_width = $config{strand_width};}
-
 if (!exists $config{show_scale})            {$numMaxTicks = 50;}
 else                                        {$numMaxTicks = $config{show_scale};}
 
-if (!exists $config{space_between_str})     {$space_between_str = 50;}
-else                                        {$space_between_str = $config{space_between_str};}
+if (!exists $config{str_width})             {$strand_width = 50;}
+else                                        {$strand_width = $config{str_width};}
+
+if (!exists $config{str_space})             {$strand_space = 50;}
+else                                        {$strand_space = $config{str_space};}
+
+if (!exists $config{space_chr})             {$space_chr = 50;}
+else                                        {$space_chr = $config{space_chr};}
 
 if    ($config{auto_scale_factor})          {$scale_factor = 1;}
 elsif (!exists $config{scale_factor})       {$scale_factor = 1000;}
@@ -142,8 +147,10 @@ else                                        {$win_size = $config{win_size};}
 if (!exists $config{rounding_method})       {$rounding_method = "floor";}
 else                                        {$rounding_method = $config{rounding_method};}
 
+if (!exists $config{ft_size})               {$fts = 16;}
+else                                        {$fts = $config{ft_size};}
 
-print "gffs : $config{gff}\n" if $config{verbose};
+print "gffs : $config{input}\n" if $config{verbose};
 print "output_img_name : $config{output_img_name}\n" if $config{verbose};
 ##> Setting parameters
 
@@ -155,7 +162,7 @@ print "Searching Max Sequence Length ... \n" if $config{debug};
 my $numOfGff = 0;
 my $maxSequenceLength = 0;
 
-foreach my $file (split(/;/, $config{'gff'})){
+foreach my $file (split(/;/, $config{input})){
     print "\tLooking at $file \n" if $config{debug};
     
     open(GFF, "<$file") or die "Can not open $file ! \n";
@@ -206,13 +213,14 @@ foreach (split(/;/, $config{'type_to_draw'})){
 $margin{'l'} = $margin{'l'} + $scaleAddWidth if ($config{show_scale});
 $picWidth = $margin{'l'}
           + $margin{'r'}
-          #+ (($numOfGff * $numOfStrand) * ($strand_width + $space_between_str));
-          + (($numOfGff * $numOfStrand    ) * $strand_width)
-          + (($numOfGff * $numOfStrand - 1) * $space_between_str);
+          + (($numOfGff * $numOfStrand      ) * $strand_width)
+         #+ (($numOfGff * $numOfStrand - 1) * $strand_space);
+          + (($numOfGff * ($numOfStrand - 1)) * $strand_space)
+          + (($numOfGff - 1) * $space_chr);
 
 if ($config{gc}){
 	$picWidth += ($numOfGff * $strand_width) 
-			  +  ($numOfGff * $space_between_str);
+			  +  ($numOfGff * $strand_space);
 }
 
 ## 1.3 Ask if image size is OK
@@ -293,8 +301,9 @@ print "Patern Regexp = $paternType\n" if $config{debug};
 
 
 # 7 Foreach file draw strand(s)
-foreach my $file (split(/;/, $config{'gff'})){
-    
+foreach my $file (split(/;/, $config{input})){
+    $countGff++;
+
     # 7.1 Load GFF
     print "Check GFF and load chromosome size ...\n" if $config{'verbose'};
     open(GFF, "<$file") or die "Cannot open $file ! \n";
@@ -374,7 +383,12 @@ foreach my $file (split(/;/, $config{'gff'})){
     # 7.4 Set Offset
     foreach (@type_array){
         if ($gffTypes{$_}{'strand'} eq "-")     {
-            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'-'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
@@ -382,7 +396,12 @@ foreach my $file (split(/;/, $config{'gff'})){
             print "y = $offset{$_}{'-'}{'y'}\n" if $config{debug};
         }
         if ($gffTypes{$_}{'strand'} eq "+")     {
-            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'+'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
@@ -390,11 +409,21 @@ foreach my $file (split(/;/, $config{'gff'})){
             print "+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
         }
         if ($gffTypes{$_}{'strand'} eq "both")  {
-            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'-'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
-            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'+'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
@@ -404,7 +433,12 @@ foreach my $file (split(/;/, $config{'gff'})){
             print "- = $offset{$_}{'+'}{'y'}\n" if $config{debug};
         }
         if ($gffTypes{$_}{'strand'} eq "fused") {
-            $offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'-+'}{'y'} = $margin{'t'};
             $count++;
             
@@ -412,15 +446,30 @@ foreach my $file (split(/;/, $config{'gff'})){
             print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
         }
         if ($gffTypes{$_}{'strand'} eq "all")   {
-            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'-'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
-            $offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'-+'}{'y'} = $margin{'t'};
             $count++;
             
-            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+            $offset{$_}{'+'}{'x'} = $margin{'l'} 
+                                  + ($count * $strand_width) 
+                                  + ($count * $strand_space)
+                                  - ($countGff * $strand_space)
+                                  + ($countGff * $space_chr);
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
@@ -434,7 +483,12 @@ foreach my $file (split(/;/, $config{'gff'})){
     }
 	
 	if ($config{gc}){
-		$offset{'gc'}{'x'} = $margin{'l'} + ($count * ($strand_width + $space_between_str));
+	   #$offset{'gc'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+        $offset{'gc'}{'x'} = $margin{'l'} 
+                           + ($count * $strand_width) 
+                           + ($count * $strand_space)
+                           - ($countGff * $strand_space)
+                           + ($countGff * $space_chr);
 		$offset{'gc'}{'y'} = $margin{'t'};
 		$count++;
 	}  
@@ -468,13 +522,13 @@ my @text = split("\t", $image->svg);
 #if (!$config{transparency}) {
     my $switchRotate = 0;
     foreach (@text){
-        if    ($config{label_strand_rotation} and /<g id="rotate_\d+">/)    {$switchRotate++;}
-        elsif ($config{label_strand_rotation} and/<\/g>/ and $switchRotate) {$switchRotate--;}
+        if    ($config{label_strand_rotation} and /<g id="rotate_\d+">/)     {$switchRotate++;}
+        elsif ($config{label_strand_rotation} and /<\/g>/ and $switchRotate) {$switchRotate--;}
         
-        if ($switchRotate) {s/x="(\d+)" y="(\d+)"/x="$1" y="$2" transform="rotate($label_strand_rotation, $1, $2)"/;}
+        if ($switchRotate) {s/x="([\d\.]+)" y="([\d\.]+)"/x="$1" y="$2" transform="rotate($label_strand_rotation, $1, $2)"/;}
 		
-        if ($config{font})			   {s/font="Helvetica"/font="$config{font}"/;}
-        if ($config{'font-size'} != 16){s/font-size="16"/font-size="$config{'font-size'}"/;}
+        if ($config{ft_family}) {s/font="Helvetica"/font-family="$config{ft_family}"/;}
+        if ($fts != 16)         {s/font-size="16"/font-size="$fts"/;}
         #s/stroke-opacity: 1.0; stroke-width: 1/stroke: none/g;
         #s/stroke-opacity: 1.0;/stroke: none;/g;
         s/stroke-opacity: 1.0;?//g;
@@ -920,7 +974,7 @@ sub drawPixelsGC{
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+                   $offset{gc}{'x'} + (($strand_width/2) - (length("GC%") * gdLargeFont->width)/2), 
                    $offset{gc}{'y'} - (2 * gdLargeFont->height), 
                    "GC%",
                    $color{'black'});
@@ -929,9 +983,9 @@ sub drawPixelsGC{
     
     # Draw strand label
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2),
+                   $offset{gc}{'x'} + (($strand_width/2) - (length("-+") * gdLargeFont->width)/2),
                    $offset{gc}{'y'} - gdLargeFont->height, 
-                   "+-",
+                   "-+",
                    $color{'black'});
     
     # close chromosome/sequence group
@@ -956,7 +1010,7 @@ sub printUsage{
 "USAGE: DensityMap.pl -gff chromosome.gff3 -ty 'match=all' -o Chromosome
     
 Options:
-    -gf    | gff string                  Gff file (version gff3 only !)          (Mandatory)
+    -i     | input string                Gff file (version gff3 only !)          (Mandatory)
                                          Format: file.gff or \"file1.gff;file2.gff\"
     -o     | output_img_name string      Name of the output image                (Mandatory)
     -ty    | type_to_draw string         List of type (column 3 of gff)          (Mandatory)
@@ -976,7 +1030,7 @@ Generic options:
     -h     | help                        This help
 
 Density options: 
-    -c     | colour_scale int            color scale to use    (Default = 7)
+    -c     | colour_scale int            Color scale to use    (Default = 7)
     -sc    | scale_factor int            = window length in bp (Default = 1000)
     -a     | auto_scale_factor int       Max picture height in pixel
     -ro    | rounding_method string      floor or ceil         (Default = floor)
@@ -987,16 +1041,17 @@ Graphical options:
     -w     | win_size int                Height of window in pixel       (Default = 1)
     -sh    | show_scale int              Draw scale, the integer indicate the maximum 
                                          tick to print on the scale      (Default = 50)
-    -st    | strand_width int            Strand width in pixel           (Default = 50)
+    -str_w | str_width int               Strand width in pixel           (Default = 50)
+    -str_s | str_space int               Space between strands in pixel  (Default = 50)
+    -sp    | space_chr int               Space between chromsomes        (Default = 50)
     -lm    | lmargin int                 Left margin in pixel            (Default = 50)
     -rm    | rmargin int                 Rigth margin in pixel           (Default = 50)
     -tm    | tmargin int                 Top margin in pixel             (Default = 50)
     -bm    | bmargin int                 Bottom margin in pixel          (Default = 50)
-    -sp    | space_between_str int       Space between strands in pixel  (Default = 50)
     -ba    | background color            Fill Background                 (Default = no Background)
     -la    | label_strand_rotation int   Rotation degree of strand label (Default = 0)
-    -font  | font string                 Font to use for text            (Default = Helvetica)
-    -font- | font-size int               Size of the font                (Default = 16)
+    -ft_f  | ft-family string            Font to use for text            (Default = Helvetica)
+    -ft_s  | ft-size int                 Size of the font                (Default = 16)
 
 
     This program is free software: you can redistribute it and/or modify
