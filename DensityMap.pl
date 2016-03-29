@@ -160,23 +160,50 @@ print "output_img_name : $config{output_img_name}\n" if $config{verbose};
 print "Searching Max Sequence Length ... \n" if $config{debug};
 
 my $numOfGff = 0;
+my %listChr;
 my $maxSequenceLength = 0;
 
-foreach my $file (split(/;/, $config{input})){
-    print "\tLooking at $file \n" if $config{debug};
-    
-    open(GFF, "<$file") or die "Can not open $file ! \n";
-    $numOfGff++;
-    
-    my $first_line = <GFF>;
-    printError ("Not GFF3 format ! (1)\n", 1) if $first_line !~ /##gff-version 3/;
-    
-    $first_line = <GFF>;
-    printError ("Not GFF3 format ! (2)\n", 1) if $first_line !~ /##sequence-region\s+[^\s]+\s+\d+\s+(\d+)/;
-    
-    $maxSequenceLength = ($1 > $maxSequenceLength) ? $1 : $maxSequenceLength;
-    close GFF;
+open(GFF, "<$config{input}") or printError("Could not open $config{input}\n", 1);
+my $initHeadSeq;
+my $initSeq;
+my $switchInitFasta = 0;
+
+while (<GFF>) {
+    chomp;
+    if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
+        $numOfGff++;
+        $initHeadSeq = $1;
+        $listChr{$initHeadSeq}{length} = $2;
+    }
+    if (/>(.+)/) {
+        $initHeadSeq = $1;
+        $switchInitFasta = 1;
+    }
+    elsif ($switchInitFasta) {
+        $listChr{$initHeadSeq}{seq} .= $_;
+    }
 }
+close GFF;
+
+foreach my $k (keys %listChr){
+    $maxSequenceLength = ($listChr{$k}{length} > $maxSequenceLength) ? $listChr{$k}{length} : $maxSequenceLength;
+}
+
+#foreach my $file (split(/;/, $config{input})){
+#    print "\tLooking at $file \n" if $config{debug};
+#    
+#    open(GFF, "<$file") or die "Can not open $file ! \n";
+#    $numOfGff++;
+#    
+#    my $first_line = <GFF>;
+#    printError ("Not GFF3 format ! (1)\n", 1) if $first_line !~ /##gff-version 3/;
+#    
+#    $first_line = <GFF>;
+#    printError ("Not GFF3 format ! (2)\n", 1) if $first_line !~ /##sequence-region\s+[^\s]+\s+\d+\s+(\d+)/;
+#    
+#    $maxSequenceLength = ($1 > $maxSequenceLength) ? $1 : $maxSequenceLength;
+#    close GFF;
+#}
 
 $margin{'t'} += 40 if ($config{title});
 if ($config{auto_scale_factor}) {
@@ -301,218 +328,273 @@ print "Patern Regexp = $paternType\n" if $config{debug};
 
 
 # 7 Foreach file draw strand(s)
-foreach my $file (split(/;/, $config{input})){
-    $countGff++;
+open(GFF, "<$config{input}") or printError("Could not open $config{input}\n", 1);
+my $seqName;
+my $switchFirstSetLoaded = 0;
+my %centromere;
 
-    # 7.1 Load GFF
-    print "Check GFF and load chromosome size ...\n" if $config{'verbose'};
-    open(GFF, "<$file") or die "Cannot open $file ! \n";
-    
-    my $first_line = <GFF>;
-       $first_line = <GFF>;
-    
-    $first_line =~ /##sequence-region\s+([^\s]+)\s+\d+\s+(\d+)/;
-    $chr_length_reel = $2;
-    $chr_length = floor($chr_length_reel/$scale_factor);
-    
-    my $seqName = $1;
-    
-    print "Loading $seqName ...\n"  if $config{verbose};
-    
-    my $boolOK = 1;
-    
-    # clean intervals sets
-    foreach (keys(%gffTypes)){
-        $gffTypes{$_}{'-'}  = [];
-        $gffTypes{$_}{'+'}  = [];
-        $gffTypes{$_}{'-+'} = [];
-    }
-    
-    my %centromere;
-    my $switchFasta = 0;
-    my $sequence;
-
-    while (<GFF>) {
-		next if /^>/;
-		$switchFasta++  if (/##FASTA/);
-		$sequence .= $_ if $switchFasta;
-		next if /^#/;
-
-        chomp;
-        my @line = split(/\t/);
-	
-		if (!$switchFasta){
-        	next if $line[2] !~ /$paternType/;
-			
-        	if ($line[2] eq "centromere") {
-            	$centromere{start} = $line[3];
-            	$centromere{end}   = $line[4];
-            	next;
-			}
-			
-        	my $ref_tabM =  $gffTypes{$line[2]}{'-'};
-        	my $ref_tabP =  $gffTypes{$line[2]}{'+'};
-        	my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
-        	
-        	if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
-        	elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
-        	                         push(@{$ref_tabMP}, [$line[3], $line[4]]);
-		}
-    }
-    close GFF;
-	
-    # 7.2 Sorting intervals
-    foreach (keys(%gffTypes)){
-		
-		my $ref_tabM =  $gffTypes{$_}{'-'};
-        my $ref_tabP =  $gffTypes{$_}{'+'};
-        my $ref_tabMP = $gffTypes{$_}{'-+'};
+while (<GFF>) {
+    if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
+        if ($switchFirstSetLoaded){
+            processData();
+            $countGff++;
+        }        
         
-        @{$ref_tabM}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabM};
-        @{$ref_tabP}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabP};
-        @{$ref_tabMP} = sort {$a->[0] <=> $b->[0]} @{$ref_tabMP};
+        $switchFirstSetLoaded = 1;
+        $seqName = $1;
+        $chr_length_reel = $2;
+        $chr_length = floor($chr_length_reel/$scale_factor);
+        
+        # 7.1 Load GFF
+        print "Loading $seqName ...\n"  if $config{verbose};
+        
+        foreach (keys(%gffTypes)){
+            $gffTypes{$_}{'-'}  = [];
+            $gffTypes{$_}{'+'}  = [];
+            $gffTypes{$_}{'-+'} = [];
+        }
+        
+        %centromere = ();
+        
     }
-    
-    # 7.3 Reducing intervals
-    foreach (keys(%gffTypes)){
-        $gffTypes{$_}{'-'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'-'}});
-        $gffTypes{$_}{'+'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'+'}});
-        $gffTypes{$_}{'-+'} = removeIntervalRedundancy(@{$gffTypes{$_}{'-+'}});
+    elsif ($seqName && /^$seqName/) {
+        my @line = split(/\t/);
+        
+        next if $line[2] !~ /$paternType/;
+			
+        if ($line[2] eq "centromere") {
+           	$centromere{start} = $line[3];
+           	$centromere{end}   = $line[4];
+           	next;
+		}
+		
+        my $ref_tabM =  $gffTypes{$line[2]}{'-'};
+        my $ref_tabP =  $gffTypes{$line[2]}{'+'};
+        my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
+        
+        if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
+        elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
+                                 push(@{$ref_tabMP}, [$line[3], $line[4]]);
     }
+    elsif(/##FASTA/) {last;}
     
-    # 7.4 Set Offset
-    foreach (@type_array){
-        if ($gffTypes{$_}{'strand'} eq "-")     {
-           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'-'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'-'}{'y'} = $margin{'t'};
-            $count++;
-            
-            print "x = $offset{$_}{'-'}{'x'}\n" if $config{debug};
-            print "y = $offset{$_}{'-'}{'y'}\n" if $config{debug};
-        }
-        if ($gffTypes{$_}{'strand'} eq "+")     {
-           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'+'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            print "+ = $offset{$_}{'+'}{'x'}\n" if $config{debug};
-            print "+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
-        }
-        if ($gffTypes{$_}{'strand'} eq "both")  {
-           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'-'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'-'}{'y'} = $margin{'t'};
-            $count++;
-            
-           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'+'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            print "+ = $offset{$_}{'-'}{'x'}\n" if $config{debug};
-            print "+ = $offset{$_}{'-'}{'y'}\n" if $config{debug};
-            print "- = $offset{$_}{'+'}{'x'}\n" if $config{debug};
-            print "- = $offset{$_}{'+'}{'y'}\n" if $config{debug};
-        }
-        if ($gffTypes{$_}{'strand'} eq "fused") {
-           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'-+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
-            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
-        }
-        if ($gffTypes{$_}{'strand'} eq "all")   {
-           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'-'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'-'}{'y'} = $margin{'t'};
-            $count++;
-            
-           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'-+'}{'y'} = $margin{'t'};
-            $count++;
-            
-           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-            $offset{$_}{'+'}{'x'} = $margin{'l'} 
-                                  + ($count * $strand_width) 
-                                  + ($count * $strand_space)
-                                  - ($countGff * $strand_space)
-                                  + ($countGff * $space_chr);
-            $offset{$_}{'+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            print "- = $offset{$_}{'-'}{'x'}\n"  if $config{debug};
-            print "- = $offset{$_}{'-'}{'y'}\n"  if $config{debug};
-            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
-            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
-            print "+ = $offset{$_}{'+'}{'x'}\n"  if $config{debug};
-            print "+ = $offset{$_}{'+'}{'y'}\n"  if $config{debug};
-        }
-    }
-	
-	if ($config{gc}){
-	   #$offset{'gc'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-        $offset{'gc'}{'x'} = $margin{'l'} 
-                           + ($count * $strand_width) 
-                           + ($count * $strand_space)
-                           - ($countGff * $strand_space)
-                           + ($countGff * $space_chr);
-		$offset{'gc'}{'y'} = $margin{'t'};
-		$count++;
-	}  
-    
-    # 7.5 Foearch type draw strands
-	 
-    foreach my $typeToDraw (@type_array){
-    	print "typeToDraw = $typeToDraw\n" if $config{'debug'};
+}
+close GFF;
 
-    	foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
-    		print "strand = $strand\n" if $config{'debug'};
-            
-    		my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-			my $cs = $gffTypes{$typeToDraw}{colour};
+processData();
 
-    		drawPixels(\$image, \%rand, $cs, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);        
-        }
-	}
-
-    if ($config{gc}){
-			printError("Fasta sequence is not in the gff file ! ", 1) if (!$switchFasta);
-			drawPixelsGC(\$image, \%rand, $gc_cs, $seqName, $chr_length, $scale_factor, $win_size, \$sequence);
-	}
-} # END 7
+#foreach my $file (split(/;/, $config{input})){
+#    $countGff++;
+#
+#    # 7.1 Load GFF
+#    print "Check GFF and load chromosome size ...\n" if $config{'verbose'};
+#    open(GFF, "<$file") or die "Cannot open $file ! \n";
+#    
+#    my $first_line = <GFF>;
+#       $first_line = <GFF>;
+#    
+#    $first_line =~ /##sequence-region\s+([^\s]+)\s+\d+\s+(\d+)/;
+#    $chr_length_reel = $2;
+#    $chr_length = floor($chr_length_reel/$scale_factor);
+#    
+#    my $seqName = $1;
+#    
+#    print "Loading $seqName ...\n"  if $config{verbose};
+#    
+#    my $boolOK = 1;
+#    
+#    # clean intervals sets
+#    foreach (keys(%gffTypes)){
+#        $gffTypes{$_}{'-'}  = [];
+#        $gffTypes{$_}{'+'}  = [];
+#        $gffTypes{$_}{'-+'} = [];
+#    }
+#    
+#    my %centromere;
+#    my $switchFasta = 0;
+#    my $sequence;
+#
+#    while (<GFF>) {
+#		next if /^>/;
+#		$switchFasta++  if (/##FASTA/);
+#		$sequence .= $_ if $switchFasta;
+#		next if /^#/;
+#
+#        chomp;
+#        my @line = split(/\t/);
+#	
+#		if (!$switchFasta){
+#        	next if $line[2] !~ /$paternType/;
+#			
+#        	if ($line[2] eq "centromere") {
+#            	$centromere{start} = $line[3];
+#            	$centromere{end}   = $line[4];
+#            	next;
+#			}
+#			
+#        	my $ref_tabM =  $gffTypes{$line[2]}{'-'};
+#        	my $ref_tabP =  $gffTypes{$line[2]}{'+'};
+#        	my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
+#        	
+#        	if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
+#        	elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
+#        	                         push(@{$ref_tabMP}, [$line[3], $line[4]]);
+#		}
+#    }
+#    close GFF;
+#	
+#    # 7.2 Sorting intervals
+#    foreach (keys(%gffTypes)){
+#		
+#		my $ref_tabM =  $gffTypes{$_}{'-'};
+#        my $ref_tabP =  $gffTypes{$_}{'+'};
+#        my $ref_tabMP = $gffTypes{$_}{'-+'};
+#        
+#        @{$ref_tabM}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabM};
+#        @{$ref_tabP}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabP};
+#        @{$ref_tabMP} = sort {$a->[0] <=> $b->[0]} @{$ref_tabMP};
+#    }
+#    
+#    # 7.3 Reducing intervals
+#    foreach (keys(%gffTypes)){
+#        $gffTypes{$_}{'-'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'-'}});
+#        $gffTypes{$_}{'+'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'+'}});
+#        $gffTypes{$_}{'-+'} = removeIntervalRedundancy(@{$gffTypes{$_}{'-+'}});
+#    }
+#    
+#    # 7.4 Set Offset
+#    foreach (@type_array){
+#        if ($gffTypes{$_}{'strand'} eq "-")     {
+#           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'-'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'-'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#            print "x = $offset{$_}{'-'}{'x'}\n" if $config{debug};
+#            print "y = $offset{$_}{'-'}{'y'}\n" if $config{debug};
+#        }
+#        if ($gffTypes{$_}{'strand'} eq "+")     {
+#           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'+'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'+'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#            print "+ = $offset{$_}{'+'}{'x'}\n" if $config{debug};
+#            print "+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+#        }
+#        if ($gffTypes{$_}{'strand'} eq "both")  {
+#           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'-'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'-'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'+'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'+'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#            print "+ = $offset{$_}{'-'}{'x'}\n" if $config{debug};
+#            print "+ = $offset{$_}{'-'}{'y'}\n" if $config{debug};
+#            print "- = $offset{$_}{'+'}{'x'}\n" if $config{debug};
+#            print "- = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+#        }
+#        if ($gffTypes{$_}{'strand'} eq "fused") {
+#           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'-+'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
+#            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
+#        }
+#        if ($gffTypes{$_}{'strand'} eq "all")   {
+#           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'-'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'-'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'-+'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#            $offset{$_}{'+'}{'x'} = $margin{'l'} 
+#                                  + ($count * $strand_width) 
+#                                  + ($count * $strand_space)
+#                                  - ($countGff * $strand_space)
+#                                  + ($countGff * $space_chr);
+#            $offset{$_}{'+'}{'y'} = $margin{'t'};
+#            $count++;
+#            
+#            print "- = $offset{$_}{'-'}{'x'}\n"  if $config{debug};
+#            print "- = $offset{$_}{'-'}{'y'}\n"  if $config{debug};
+#            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
+#            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
+#            print "+ = $offset{$_}{'+'}{'x'}\n"  if $config{debug};
+#            print "+ = $offset{$_}{'+'}{'y'}\n"  if $config{debug};
+#        }
+#    }
+#	
+#	if ($config{gc}){
+#	   #$offset{'gc'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
+#        $offset{'gc'}{'x'} = $margin{'l'} 
+#                           + ($count * $strand_width) 
+#                           + ($count * $strand_space)
+#                           - ($countGff * $strand_space)
+#                           + ($countGff * $space_chr);
+#		$offset{'gc'}{'y'} = $margin{'t'};
+#		$count++;
+#	}  
+#    
+#    # 7.5 Foearch type draw strands
+#	 
+#    foreach my $typeToDraw (@type_array){
+#    	print "typeToDraw = $typeToDraw\n" if $config{'debug'};
+#
+#    	foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
+#    		print "strand = $strand\n" if $config{'debug'};
+#            
+#    		my $ref_tab = $gffTypes{$typeToDraw}{$strand};
+#			my $cs = $gffTypes{$typeToDraw}{colour};
+#
+#    		drawPixels(\$image, \%rand, $cs, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);        
+#        }
+#	}
+#
+#    if ($config{gc}){
+#			printError("Fasta sequence is not in the gff file ! ", 1) if (!$switchFasta);
+#			drawPixelsGC(\$image, \%rand, $gc_cs, $seqName, $chr_length, $scale_factor, $win_size, \$sequence);
+#	}
+#} # END 7
 
 
 # 8 Applying rotation to labels and Saving picture
@@ -570,6 +652,102 @@ print "Image saved ! \n";
 
 ###########################################################################
 ################################ Fonctions ################################
+###########################################################################
+sub processData{
+    # 7.2 Sorting intervals
+    foreach (keys(%gffTypes)){
+        
+        my $ref_tabM =  $gffTypes{$_}{'-'};
+        my $ref_tabP =  $gffTypes{$_}{'+'};
+        my $ref_tabMP = $gffTypes{$_}{'-+'};
+        
+        @{$ref_tabM}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabM};
+        @{$ref_tabP}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabP};
+        @{$ref_tabMP} = sort {$a->[0] <=> $b->[0]} @{$ref_tabMP};
+    }
+    
+    # 7.3 Reducing intervals
+    foreach (keys(%gffTypes)){
+        $gffTypes{$_}{'-'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'-'}});
+        $gffTypes{$_}{'+'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'+'}});
+        $gffTypes{$_}{'-+'} = removeIntervalRedundancy(@{$gffTypes{$_}{'-+'}});
+    }
+    
+    # 7.4 Set Offset
+    foreach (@type_array){
+        if ($gffTypes{$_}{'strand'} eq "-")     {
+            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-'}{'y'} = $margin{'t'};
+            $count++;
+            
+            print "x = $offset{$_}{'-'}{'x'}\ny = $offset{$_}{'-'}{'y'}\n" if $config{debug};
+        }
+        elsif ($gffTypes{$_}{'strand'} eq "+")     {
+            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'+'}{'y'} = $margin{'t'};
+            $count++;
+            
+            print "+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+        }
+        elsif ($gffTypes{$_}{'strand'} eq "both")  {
+            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-'}{'y'} = $margin{'t'};
+            $count++;
+            
+            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'+'}{'y'} = $margin{'t'};
+            $count++;
+            
+            print "+ = $offset{$_}{'-'}{'x'}\n+ = $offset{$_}{'-'}{'y'}\n- = $offset{$_}{'+'}{'x'}\n- = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+        }
+        elsif ($gffTypes{$_}{'strand'} eq "fused") {
+            $offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-+'}{'y'} = $margin{'t'};
+            $count++;
+            
+            print "f = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
+        }
+        elsif ($gffTypes{$_}{'strand'} eq "all")   {
+            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-'}{'y'} = $margin{'t'};
+            $count++;
+            
+            $offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-+'}{'y'} = $margin{'t'};
+            $count++;
+            
+            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'+'}{'y'} = $margin{'t'};
+            $count++;
+            
+            print "- = $offset{$_}{'-'}{'x'}\n- = $offset{$_}{'-'}{'y'}\nf = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+        }
+    }
+    
+    if ($config{gc}){
+        $offset{'gc'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+        $offset{'gc'}{'y'} = $margin{'t'};
+        $count++;
+    }
+    
+    foreach my $typeToDraw (@type_array){
+        print "typeToDraw = $typeToDraw\n" if $config{'debug'};
+    
+        foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
+            print "strand = $strand\n" if $config{'debug'};
+            
+            my $ref_tab = $gffTypes{$typeToDraw}{$strand};
+            my $cs = $gffTypes{$typeToDraw}{colour};
+    
+            drawPixels(\$image, \%rand, $cs, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);        
+        }
+    }
+    
+    if ($config{gc}){
+            printError("Fasta sequence is not in the gff file ! ", 1) if (!$listChr{$seqName}{seq});
+            drawPixelsGC(\$image, \%rand, $gc_cs, $seqName, $chr_length, $scale_factor, $win_size, \$listChr{$seqName}{seq});
+    }
+}
 ###########################################################################
 sub removeIntervalRedundancy{
     
