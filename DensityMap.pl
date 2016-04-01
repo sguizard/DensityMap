@@ -778,8 +778,8 @@ sub drawPixels{
         
     	next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
 	$posPic++;
-	
-        # Get number of base covered by the previous on pixel crosssing interval
+        
+	# Get number of base covered by the previous on pixel crosssing interval
         my $basesCoverred = shift @previousBases;
         $basesCoverred = 0 if (!defined $basesCoverred); # if @previousBases is empty
         
@@ -799,8 +799,7 @@ sub drawPixels{
             # get clearly start and end 
             $intervals{'start_reel'}  = $ref_interval->[0];
             $intervals{'end_reel'}    = $ref_interval->[1];
-    	    next if ($intervals{'start_reel'} < ($posPic*$scaleFactor) || $intervals{'end_reel'} > ($posPic*$scaleFactor+$scaleFactor));
- 
+
             print "\tstart_reel = $intervals{'start_reel'}\n"           if $config{'debug'};
             print "\tend_reel   = $intervals{'end_reel'}\n"             if $config{'debug'};
             print "\tcheck position\n"                                  if $config{'debug'};
