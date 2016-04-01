@@ -21,6 +21,7 @@ use POSIX;
 my %config;
 GetOptions (\%config,
             'input=s',
+	    'region_file=s',
             'type_to_draw=s', 
             'output_img_name=s',
             'rounding_method=s',
@@ -138,7 +139,7 @@ else                                        {$label_strand_rotation = $config{la
 if (!exists $config{colour_scale})          {$colour_scale = 7;}
 else                                        {$colour_scale = $config{colour_scale};}
 
-if (!exists $config{gc})          			{$gc_cs = 7;}
+if (!exists $config{gc})          	    {$gc_cs = 7;}
 else                                        {$gc_cs = $config{gc};}
 
 if (!exists $config{win_size})              {$win_size = 1;}
@@ -153,6 +154,21 @@ else                                        {$fts = $config{ft_size};}
 print "gffs : $config{input}\n" if $config{verbose};
 print "output_img_name : $config{output_img_name}\n" if $config{verbose};
 ##> Setting parameters
+
+
+# -1. Load region if defined
+my %region;
+if ($config{region_file}) {
+	open(REGION, "<$config{region_file}") or die "Can not open $config{region_file} ! ";
+	while (<REGION>) {
+		chomp;
+		my @bed = split("\t");
+		$region{$bed[0]}{length} = $bed[2]-$bed[1];
+		$region{$bed[0]}{start}  = $bed[1];
+		$region{$bed[0]}{end}    = $bed[2];
+	}
+	close REGION;
+}
 
 
 # 1. Get Image size
@@ -185,10 +201,16 @@ while (<GFF>) {
 }
 close GFF;
 
-foreach my $k (keys %listChr){
-    $maxSequenceLength = ($listChr{$k}{length} > $maxSequenceLength) ? $listChr{$k}{length} : $maxSequenceLength;
+if ($config{region_file}) {
+	foreach my $k (keys %region){
+	    $maxSequenceLength = ($region{$k}{length} > $maxSequenceLength) ? $region{$k}{length} : $maxSequenceLength;
+	}
 }
-
+else {
+	foreach my $k (keys %listChr){
+	    $maxSequenceLength = ($listChr{$k}{length} > $maxSequenceLength) ? $listChr{$k}{length} : $maxSequenceLength;
+	}
+}
 #foreach my $file (split(/;/, $config{input})){
 #    print "\tLooking at $file \n" if $config{debug};
 #    
@@ -267,7 +289,7 @@ my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 # 3 Loading colors from colours.txt
 print "Load colours ...\n" if $config{'verbose'};
-open(COLOR, "<./colours.txt") or die "Can not open colours.txt";
+open(COLOR, "</usr/local/share/DensityMap/colours.txt") or die "Can not open colours.txt";
 while (<COLOR>) {
     next if /^#/;
     /([\d\w]+);(\d+);(\d+);(\d+)/;
@@ -333,6 +355,12 @@ my $seqName;
 my $switchFirstSetLoaded = 0;
 my %centromere;
 
+
+my $csv = $config{output_img_name};
+$csv =~ s/.svg/.csv/g;
+open(CSV, ">$csv") or die "Can not open $csv ! ";
+print CSV "sequence\tfeature\tstart\tend\tdensity\n";
+
 while (<GFF>) {
     if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
         if ($switchFirstSetLoaded){
@@ -382,223 +410,10 @@ while (<GFF>) {
 close GFF;
 
 processData();
-
-#foreach my $file (split(/;/, $config{input})){
-#    $countGff++;
-#
-#    # 7.1 Load GFF
-#    print "Check GFF and load chromosome size ...\n" if $config{'verbose'};
-#    open(GFF, "<$file") or die "Cannot open $file ! \n";
-#    
-#    my $first_line = <GFF>;
-#       $first_line = <GFF>;
-#    
-#    $first_line =~ /##sequence-region\s+([^\s]+)\s+\d+\s+(\d+)/;
-#    $chr_length_reel = $2;
-#    $chr_length = floor($chr_length_reel/$scale_factor);
-#    
-#    my $seqName = $1;
-#    
-#    print "Loading $seqName ...\n"  if $config{verbose};
-#    
-#    my $boolOK = 1;
-#    
-#    # clean intervals sets
-#    foreach (keys(%gffTypes)){
-#        $gffTypes{$_}{'-'}  = [];
-#        $gffTypes{$_}{'+'}  = [];
-#        $gffTypes{$_}{'-+'} = [];
-#    }
-#    
-#    my %centromere;
-#    my $switchFasta = 0;
-#    my $sequence;
-#
-#    while (<GFF>) {
-#		next if /^>/;
-#		$switchFasta++  if (/##FASTA/);
-#		$sequence .= $_ if $switchFasta;
-#		next if /^#/;
-#
-#        chomp;
-#        my @line = split(/\t/);
-#	
-#		if (!$switchFasta){
-#        	next if $line[2] !~ /$paternType/;
-#			
-#        	if ($line[2] eq "centromere") {
-#            	$centromere{start} = $line[3];
-#            	$centromere{end}   = $line[4];
-#            	next;
-#			}
-#			
-#        	my $ref_tabM =  $gffTypes{$line[2]}{'-'};
-#        	my $ref_tabP =  $gffTypes{$line[2]}{'+'};
-#        	my $ref_tabMP = $gffTypes{$line[2]}{'-+'};
-#        	
-#        	if    ($line[6] eq "-") {push(@{$ref_tabM},  [$line[3], $line[4]]);}
-#        	elsif ($line[6] eq "+") {push(@{$ref_tabP},  [$line[3], $line[4]]);}
-#        	                         push(@{$ref_tabMP}, [$line[3], $line[4]]);
-#		}
-#    }
-#    close GFF;
-#	
-#    # 7.2 Sorting intervals
-#    foreach (keys(%gffTypes)){
-#		
-#		my $ref_tabM =  $gffTypes{$_}{'-'};
-#        my $ref_tabP =  $gffTypes{$_}{'+'};
-#        my $ref_tabMP = $gffTypes{$_}{'-+'};
-#        
-#        @{$ref_tabM}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabM};
-#        @{$ref_tabP}  = sort {$a->[0] <=> $b->[0]} @{$ref_tabP};
-#        @{$ref_tabMP} = sort {$a->[0] <=> $b->[0]} @{$ref_tabMP};
-#    }
-#    
-#    # 7.3 Reducing intervals
-#    foreach (keys(%gffTypes)){
-#        $gffTypes{$_}{'-'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'-'}});
-#        $gffTypes{$_}{'+'}  = removeIntervalRedundancy(@{$gffTypes{$_}{'+'}});
-#        $gffTypes{$_}{'-+'} = removeIntervalRedundancy(@{$gffTypes{$_}{'-+'}});
-#    }
-#    
-#    # 7.4 Set Offset
-#    foreach (@type_array){
-#        if ($gffTypes{$_}{'strand'} eq "-")     {
-#           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'-'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'-'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#            print "x = $offset{$_}{'-'}{'x'}\n" if $config{debug};
-#            print "y = $offset{$_}{'-'}{'y'}\n" if $config{debug};
-#        }
-#        if ($gffTypes{$_}{'strand'} eq "+")     {
-#           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'+'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'+'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#            print "+ = $offset{$_}{'+'}{'x'}\n" if $config{debug};
-#            print "+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
-#        }
-#        if ($gffTypes{$_}{'strand'} eq "both")  {
-#           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'-'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'-'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'+'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'+'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#            print "+ = $offset{$_}{'-'}{'x'}\n" if $config{debug};
-#            print "+ = $offset{$_}{'-'}{'y'}\n" if $config{debug};
-#            print "- = $offset{$_}{'+'}{'x'}\n" if $config{debug};
-#            print "- = $offset{$_}{'+'}{'y'}\n" if $config{debug};
-#        }
-#        if ($gffTypes{$_}{'strand'} eq "fused") {
-#           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'-+'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
-#            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
-#        }
-#        if ($gffTypes{$_}{'strand'} eq "all")   {
-#           #$offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'-'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'-'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#           #$offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'-+'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'-+'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#           #$offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#            $offset{$_}{'+'}{'x'} = $margin{'l'} 
-#                                  + ($count * $strand_width) 
-#                                  + ($count * $strand_space)
-#                                  - ($countGff * $strand_space)
-#                                  + ($countGff * $space_chr);
-#            $offset{$_}{'+'}{'y'} = $margin{'t'};
-#            $count++;
-#            
-#            print "- = $offset{$_}{'-'}{'x'}\n"  if $config{debug};
-#            print "- = $offset{$_}{'-'}{'y'}\n"  if $config{debug};
-#            print "f = $offset{$_}{'-+'}{'x'}\n" if $config{debug};
-#            print "f = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
-#            print "+ = $offset{$_}{'+'}{'x'}\n"  if $config{debug};
-#            print "+ = $offset{$_}{'+'}{'y'}\n"  if $config{debug};
-#        }
-#    }
-#	
-#	if ($config{gc}){
-#	   #$offset{'gc'}{'x'} = $margin{'l'} + ($count * ($strand_width + $strand_space));
-#        $offset{'gc'}{'x'} = $margin{'l'} 
-#                           + ($count * $strand_width) 
-#                           + ($count * $strand_space)
-#                           - ($countGff * $strand_space)
-#                           + ($countGff * $space_chr);
-#		$offset{'gc'}{'y'} = $margin{'t'};
-#		$count++;
-#	}  
-#    
-#    # 7.5 Foearch type draw strands
-#	 
-#    foreach my $typeToDraw (@type_array){
-#    	print "typeToDraw = $typeToDraw\n" if $config{'debug'};
-#
-#    	foreach my $strand (split(";", $order{$gffTypes{$typeToDraw}{'strand'}})){
-#    		print "strand = $strand\n" if $config{'debug'};
-#            
-#    		my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-#			my $cs = $gffTypes{$typeToDraw}{colour};
-#
-#    		drawPixels(\$image, \%rand, $cs, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);        
-#        }
-#	}
-#
-#    if ($config{gc}){
-#			printError("Fasta sequence is not in the gff file ! ", 1) if (!$switchFasta);
-#			drawPixelsGC(\$image, \%rand, $gc_cs, $seqName, $chr_length, $scale_factor, $win_size, \$sequence);
-#	}
-#} # END 7
-
+close CSV;
 
 # 8 Applying rotation to labels and Saving picture
-open(IMG, ">$config{output_img_name}.svg") or die "Can not open $config{output_img_name} ! ";
+open(IMG, ">$config{output_img_name}") or die "Can not open $config{output_img_name} ! ";
 binmode IMG;
 my @text = split("\t", $image->svg);
 #if (!$config{transparency}) {
@@ -768,7 +583,7 @@ sub removeIntervalRedundancy{
     foreach my $annot (@gff) {
         
         # The intervals of the gff have been sorted by 'start' before using this function
-        # so only three case are possibles :
+        # so only three case are possebles :
         #   #1 Previous and current intervals crossing
         #   #2 Current interval included in previous interval
         #   #3 Current interval not inclued in previous interval
@@ -958,8 +773,12 @@ sub drawPixels{
     $$ref_img->startGroup("${strand}_${randNum}");
     
     # For each pixel of the chromosome/sequence
+    my $posPic = 0;
     for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
         
+    	next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
+	$posPic++;
+	
         # Get number of base covered by the previous on pixel crosssing interval
         my $basesCoverred = shift @previousBases;
         $basesCoverred = 0 if (!defined $basesCoverred); # if @previousBases is empty
@@ -980,7 +799,8 @@ sub drawPixels{
             # get clearly start and end 
             $intervals{'start_reel'}  = $ref_interval->[0];
             $intervals{'end_reel'}    = $ref_interval->[1];
-            
+    	    next if ($intervals{'start_reel'} < ($posPic*$scaleFactor) || $intervals{'end_reel'} > ($posPic*$scaleFactor+$scaleFactor));
+ 
             print "\tstart_reel = $intervals{'start_reel'}\n"           if $config{'debug'};
             print "\tend_reel   = $intervals{'end_reel'}\n"             if $config{'debug'};
             print "\tcheck position\n"                                  if $config{'debug'};
@@ -1032,9 +852,21 @@ sub drawPixels{
         if ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
         
         # Draw the current pixel
-        $$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                    $offset{$type}{$strand}{'y'} + $pos * $win_size,
-                                   $offset{$type}{$strand}{'x'} + $strand_width,    $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
-                                   $color{"${cs}_heatmap$percentage"});
+	if ($config{region_file}) {
+		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                    $offset{$type}{$strand}{'y'} + $posPic * $win_size,
+        	                           $offset{$type}{$strand}{'x'} + $strand_width,    $offset{$type}{$strand}{'y'} + $posPic * $win_size + $win_size,
+        	                           $color{"${cs}_heatmap$percentage"});
+	}
+	else {
+		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                    $offset{$type}{$strand}{'y'} + $pos * $win_size,
+        	                           $offset{$type}{$strand}{'x'} + $strand_width,    $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
+        	                           $color{"${cs}_heatmap$percentage"});
+	}
+
+	my $st = $pos * $scaleFactor;
+	my $en = $pos * $scaleFactor + $scaleFactor;
+	print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
+	
     }# End # For each pixel of the chromosome/sequence
     
     # Draw Centromere
@@ -1093,11 +925,11 @@ sub drawPixelsGC{
     #   - $ref_img      ->  ref of the image
     #   - $ref_rand     ->  ref on the hash of random numbers
     #   - $cs           ->  colour_scale to use for colors
-	#	- $seqName		->	Name of the annotated sequence
+    #	- $seqName		->	Name of the annotated sequence
     #   - $chr_size     ->  Chromosome/Sequence size
     #   - $scaleFactor  ->  Scale_factor
-	#	- $win_size		->	Size of the printed window in pixel
-	#	- $ref_sequence	->	sequence of the chromosome
+    #	- $win_size		->	Size of the printed window in pixel
+    #	- $ref_sequence	->	sequence of the chromosome
     # Ouput : none
     
     print "Start Drawing pixels GC ...\n" if $config{'verbose'};
@@ -1119,12 +951,16 @@ sub drawPixelsGC{
     $$ref_img->startGroup("+-_${randNum}");
     
     # For each pixel of the chromosome/sequence
+    my $posPic = 0;
     for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
-		#Get next window sequence
-		my $win_seq = substr $$ref_sequence, 0, $scaleFactor, '';
+	#Get next window sequence
+	my $win_seq = substr $$ref_sequence, 0, $scaleFactor, '';
+	
+	next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
+	$posPic++;
 
-		#Count GC bases
-		my $gcBases = $win_seq =~ tr/GC//;
+	#Count GC bases
+	my $gcBases = $win_seq =~ tr/GC//;
 
         # Compute percentage of base coverage
         my $percentage;
@@ -1135,9 +971,22 @@ sub drawPixelsGC{
         if ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
         
         # Draw the current pixel
-        $$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $pos * $win_size,
-                                   $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $pos * $win_size + $win_size,
-                                   $color{"${cs}_heatmap$percentage"});
+	if ($config{region_file}) {
+        	$$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $posPic * $win_size,
+                	                   $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $posPic * $win_size + $win_size,
+                	                   $color{"${cs}_heatmap$percentage"});
+	}
+	else {
+		$$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $pos * $win_size,
+                                           $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $pos * $win_size + $win_size,
+                                           $color{"${cs}_heatmap$percentage"});
+	}
+
+        my $st = $pos * $scaleFactor;
+        my $en = $pos * $scaleFactor + $scaleFactor;
+
+        print CSV "$seqName\tGC%\t$st\t$en\t$percentage\n";
+
     }# End # For each pixel of the chromosome/sequence
     
     # Open label group for next rotation 
@@ -1189,6 +1038,12 @@ sub printUsage{
     
 Options:
     -i     | input string                Gff file (version gff3 only !)          (Mandatory)
+    -re    | region_file string          A bed file describing the regions to plot 
+                                         for each sequence to plot. Allow to plot 
+                                         sepecific region and not whole sequence.
+                                         Exemple:
+                                         seq1\t100000\t200000
+                                         seq2\t200000\t350000
                                          Format: file.gff or \"file1.gff;file2.gff\"
     -o     | output_img_name string      Name of the output image                (Mandatory)
     -ty    | type_to_draw string         List of type (column 3 of gff)          (Mandatory)
