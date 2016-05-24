@@ -8,6 +8,8 @@ use Getopt::Long;
 #use Data::Dumper;
 use GD::SVG;
 use POSIX;
+use Cwd 'abs_path';
+use File::Basename;
 
 #> Setting Parameters
 
@@ -289,7 +291,7 @@ my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 # 3 Loading colors from colours.txt
 print "Load colours ...\n" if $config{'verbose'};
-open(COLOR, "</usr/local/share/DensityMap/colours.txt") or die "Can not open colours.txt";
+open(COLOR, "<".dirname(abs_path($0))."/colours.txt") or die "Can not open colours.txt";
 while (<COLOR>) {
     next if /^#/;
     /([\d\w]+);(\d+);(\d+);(\d+)/;
