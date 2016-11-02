@@ -23,7 +23,7 @@ use File::Basename;
 my %config;
 GetOptions (\%config,
             'input=s',
-	    'region_file=s',
+            'region_file=s',
             'type_to_draw=s', 
             'output_img_name=s',
             'rounding_method=s',
@@ -58,8 +58,7 @@ if ($config{help}) {printUsage(1);}
 ##> Check if gff file exist, if no mandatory parameter are missing
 if (!exists $config{input} or
     !exists $config{output_img_name} or
-    !exists $config{type_to_draw})
-                                        {printError ("\n!!!!gff, output_img_name, type_to_draw options are MANDATORY !!!!! \n\n\n", 0); printUsage(1);}
+    !exists $config{type_to_draw}) {printError ("\n!!!!gff, output_img_name, type_to_draw options are MANDATORY !!!!! \n\n\n", 0); printUsage(1);}
 #if (! -e $config{input})                  {printError ("gff $config{input} not exist ! \n"); printUsage(1);}
 
 ##> Setting Global Variables
@@ -89,15 +88,15 @@ my %color;
 my %gffTypes;
 my %margin;
 my %order;
-$order{'-'} = "-";
-$order{'+'} = "+";
-$order{'both'} = "-;+";
+$order{'-'}     = "-";
+$order{'+'}     = "+";
+$order{'both'}  = "-;+";
 $order{'fused'} = "-+";
-$order{'all'} = "-;-+;+";
+$order{'all'}   = "-;-+;+";
 my %rand;
 my %offset;
-$offset{'x'} = 0;
-$offset{'y'} = 0;
+$offset{'x'}  = 0;
+$offset{'y'}  = 0;
 $offset{'x1'} = 0;
 $offset{'y1'} = 0;
 $offset{'x2'} = 0;
@@ -141,7 +140,7 @@ else                                        {$label_strand_rotation = $config{la
 if (!exists $config{colour_scale})          {$colour_scale = 7;}
 else                                        {$colour_scale = $config{colour_scale};}
 
-if (!exists $config{gc})          	    {$gc_cs = 7;}
+if (!exists $config{gc})          	        {$gc_cs = 7;}
 else                                        {$gc_cs = $config{gc};}
 
 if (!exists $config{win_size})              {$win_size = 1;}
@@ -229,7 +228,7 @@ else {
 #    close GFF;
 #}
 
-$margin{'t'} += 40 if ($config{title});
+if ($config{title}) {$margin{'t'} += 40};
 if ($config{auto_scale_factor}) {
     while (1) {
         $picHeight = $margin{'t'}
@@ -245,6 +244,7 @@ else{
                + $margin{'b'}
                + (floor(($maxSequenceLength/$scale_factor)*$win_size));
 }
+
 ## 1.2 Width (+Check type option)
 my $numOfStrand = 0;
 
