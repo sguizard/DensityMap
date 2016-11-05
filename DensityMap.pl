@@ -24,7 +24,8 @@ my %config;
 GetOptions (\%config,
             'input=s',
             'region_file=s',
-            'type_to_draw=s', 
+			'fasta=s',
+            'type_to_draw=s',
             'output_img_name=s',
             'rounding_method=s',
             'show_scale=i',
@@ -43,12 +44,13 @@ GetOptions (\%config,
             'title=s',
             'force',
             'win_size=i',
-            'verbose',
-            'debug',
             'colour_scale=i',
             'gc=i',
             'ft_family=s',
-            'ft_size=i');
+            'ft_size=i',
+			'verbose',
+            'debug',
+			'help');
 
 
 ##> Print USAGE if --help
@@ -62,28 +64,6 @@ if (!exists $config{input} or
 #if (! -e $config{input})                  {printError ("gff $config{input} not exist ! \n"); printUsage(1);}
 
 ##> Setting Global Variables
-my $paternType = "(";
-my $scaleAddWidth = 100; 
-my $numMaxTicks;
-my $numTicks;
-my $chr_length;
-my $chr_length_reel;
-my $scale_factor;
-my $strand_width;
-my $strand_space;
-my $label_strand_rotation;
-my $picHeight;
-my $picWidth;
-my $colour_scale;
-my $count = 0;
-my $countGff = -1;
-my $win_size;
-my $rounding_method;
-my $gc_cs;
-my $font;
-my $fts = 16; 
-my $space_chr;
-
 my %color;
 my %gffTypes;
 my %margin;
@@ -102,58 +82,39 @@ $offset{'y1'} = 0;
 $offset{'x2'} = 0;
 $offset{'y2'} = 0;
 
-
 $| = 1;
 
+my $scale_factor          = ($config{auto_scale_factor})     ? 1 : ($config{scale_factor}) ? $config{scale_factor} : 1000;
+my $numMaxTicks           = ($config{show_scale})            ? $config{show_scale}            : 50;
+my $strand_width          = ($config{str_width})             ? $config{str_width}             : 50;
+my $strand_space          = ($config{str_space})             ? $config{str_space}             : 50;
+my $space_chr             = ($config{space_chr})             ? $config{space_chr}             : 50;
+   $margin{l}             = ($config{lmargin})               ? $config{lmargin}               : 50;
+   $margin{r}             = ($config{rmargin})               ? $config{rmargin}               : 50;
+   $margin{t}             = ($config{tmargin})               ? $config{tmargin}               : 50;
+   $margin{b}             = ($config{bmargin})               ? $config{bmargin}               : 50;
+my $label_strand_rotation = ($config{label_strand_rotation}) ? $config{label_strand_rotation} : 0;
+my $colour_scale          = ($config{colour_scale})          ? $config{colour_scale}          : 7;
+my $gc_cs                 = ($config{gc})                    ? $config{gc}                    : 7;
+my $win_size              = ($config{win_size})              ? $config{win_size}              : 1;
+my $rounding_method       = ($config{rounding_method})       ? $config{rounding_method}       : "floor";
+my $fts                   = ($config{ft_size})               ? $config{ft_size}               : 16;
+my $v                     = ($config{verbose})               ? 1                              : 0;
+my $d                     = ($config{debug})                 ? 1                              : 0;
+my $paternType = "(";
+my $scaleAddWidth = 100; 
+my $numTicks;
+my $chr_length;
+my $chr_length_reel;
+my $picHeight;
+my $picWidth;
+my $count = 0;
+my $countGff = -1;
+my $font;
 
-if (!exists $config{show_scale})            {$numMaxTicks = 50;}
-else                                        {$numMaxTicks = $config{show_scale};}
 
-if (!exists $config{str_width})             {$strand_width = 50;}
-else                                        {$strand_width = $config{str_width};}
-
-if (!exists $config{str_space})             {$strand_space = 50;}
-else                                        {$strand_space = $config{str_space};}
-
-if (!exists $config{space_chr})             {$space_chr = 50;}
-else                                        {$space_chr = $config{space_chr};}
-
-if    ($config{auto_scale_factor})          {$scale_factor = 1;}
-elsif (!exists $config{scale_factor})       {$scale_factor = 1000;}
-else                                        {$scale_factor = $config{scale_factor};}
-
-if (!exists $config{lmargin})               {$margin{l} = 50;}
-else                                        {$margin{l} = $config{lmargin};}
-
-if (!exists $config{rmargin})               {$margin{r} = 50;}
-else                                        {$margin{r} = $config{rmargin};}
-
-if (!exists $config{tmargin})               {$margin{t} = 50;}
-else                                        {$margin{t} = $config{tmargin};}
-
-if (!exists $config{bmargin})               {$margin{b} = 50;}
-else                                        {$margin{b} = $config{bmargin};}
-
-if (!exists $config{label_strand_rotation}) {$label_strand_rotation = 0;}
-else                                        {$label_strand_rotation = $config{label_strand_rotation};}
-
-if (!exists $config{colour_scale})          {$colour_scale = 7;}
-else                                        {$colour_scale = $config{colour_scale};}
-
-if (!exists $config{gc})          	        {$gc_cs = 7;}
-else                                        {$gc_cs = $config{gc};}
-
-if (!exists $config{win_size})              {$win_size = 1;}
-else                                        {$win_size = $config{win_size};}
-
-if (!exists $config{rounding_method})       {$rounding_method = "floor";}
-else                                        {$rounding_method = $config{rounding_method};}
-
-if (!exists $config{ft_size})               {$fts = 16;}
-else                                        {$fts = $config{ft_size};}
-
-print "gffs : $config{input}\n" if $config{verbose};
-print "output_img_name : $config{output_img_name}\n" if $config{verbose};
+print "gffs : $config{input}\n" if $v;
+print "output_img_name : $config{output_img_name}\n" if $v;
 ##> Setting parameters
 
 
@@ -164,24 +125,35 @@ if ($config{region_file}) {
 	while (<REGION>) {
 		chomp;
 		my @bed = split("\t");
-		$region{$bed[0]}{length} = $bed[2]-$bed[1];
+		$region{$bed[0]}{length} = $bed[2] - $bed[1];
 		$region{$bed[0]}{start}  = $bed[1];
 		$region{$bed[0]}{end}    = $bed[2];
 	}
 	close REGION;
 }
 
+# 0. Read fasta file
+my %listChr;
+my $seqHeader;
+
+if ($config{fasta}){
+	open FASTA, "<$config{fasta}";
+	while (<FASTA>){
+		chomp;
+	    if (/>(.+)/) {$seqHeader = $1;}
+		else {$listChr{$seqHeader}{seq} .= $_;}
+	}
+	close FASTA;
+}
 
 # 1. Get Image size
 ## 1.1 Height (+Check GFF validity)
-print "Searching Max Sequence Length ... \n" if $config{debug};
+print "Searching Max Sequence Length ... \n" if $d;
 
-my $numOfGff = 0;
-my %listChr;
+my $numOfGff          = 0;
 my $maxSequenceLength = 0;
 
 open(GFF, "<$config{input}") or printError("Could not open $config{input}\n", 1);
-my $initHeadSeq;
 my $initSeq;
 my $switchInitFasta = 0;
 
@@ -189,16 +161,16 @@ while (<GFF>) {
     chomp;
     if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
         $numOfGff++;
-        $initHeadSeq = $1;
-        $listChr{$initHeadSeq}{length} = $2;
+        $seqHeader = $1;
+        $listChr{$seqHeader}{length} = $2;
     }
     if (/>(.+)/) {
-        $initHeadSeq = $1;
+        $seqHeader = $1;
         $switchInitFasta = 1;
     }
     elsif ($switchInitFasta) {
-        $listChr{$initHeadSeq}{seq} .= $_;
-    }
+        $listChr{$seqHeader}{seq} .= $_;
+}
 }
 close GFF;
 
@@ -212,23 +184,11 @@ else {
 	    $maxSequenceLength = ($listChr{$k}{length} > $maxSequenceLength) ? $listChr{$k}{length} : $maxSequenceLength;
 	}
 }
-#foreach my $file (split(/;/, $config{input})){
-#    print "\tLooking at $file \n" if $config{debug};
-#    
-#    open(GFF, "<$file") or die "Can not open $file ! \n";
-#    $numOfGff++;
-#    
-#    my $first_line = <GFF>;
-#    printError ("Not GFF3 format ! (1)\n", 1) if $first_line !~ /##gff-version 3/;
-#    
-#    $first_line = <GFF>;
-#    printError ("Not GFF3 format ! (2)\n", 1) if $first_line !~ /##sequence-region\s+[^\s]+\s+\d+\s+(\d+)/;
-#    
-#    $maxSequenceLength = ($1 > $maxSequenceLength) ? $1 : $maxSequenceLength;
-#    close GFF;
-#}
+
 
 if ($config{title}) {$margin{'t'} += 40};
+
+
 if ($config{auto_scale_factor}) {
     while (1) {
         $picHeight = $margin{'t'}
@@ -253,10 +213,12 @@ foreach (split(/;/, $config{'type_to_draw'})){
     if($_=~ /([^=]+)=([^=]+)/){
         push @type_array, $1;
         
-        if   ($2 eq "-" or $2 eq "+" or $2 eq "fused")  {$numOfStrand++;}
-        elsif($2 eq "both")                             {$numOfStrand += 2;}
-        elsif($2 eq "all")                              {$numOfStrand += 3;}
-        else                                            {printError("Type option : INVALID STRAND FORMAT, check help please.\n", 1);}
+        if   ($2 eq "-" or
+			  $2 eq "+" or
+			  $2 eq "fused")  {$numOfStrand++;}
+        elsif($2 eq "both")   {$numOfStrand += 2;}
+        elsif($2 eq "all")    {$numOfStrand += 3;}
+        else                  {printError("Type option : INVALID STRAND FORMAT, check help please.\n", 1);}
     }
     else {printError("Type option : INVALID FORMAT, check help please.\n", 1);}
 }
@@ -265,7 +227,6 @@ $margin{'l'} = $margin{'l'} + $scaleAddWidth if ($config{show_scale});
 $picWidth = $margin{'l'}
           + $margin{'r'}
           + (($numOfGff * $numOfStrand      ) * $strand_width)
-         #+ (($numOfGff * $numOfStrand - 1) * $strand_space);
           + (($numOfGff * ($numOfStrand - 1)) * $strand_space)
           + (($numOfGff - 1) * $space_chr);
 
@@ -324,9 +285,9 @@ if ($config{title}){
     }
 }
 if ($config{show_scale}) {
-    print "Drawing Scale ...\n" if $config{verbose};
+    print "Drawing Scale ...\n" if $v;
     my $scale_size = floor($maxSequenceLength/$scale_factor);
-    print "Scale_size : $scale_size\n" if $config{debug};
+    print "Scale_size : $scale_size\n" if $d;
     drawScale(\$image, $scale_size, $maxSequenceLength, $scaleAddWidth, $scale_factor, $numMaxTicks, $margin{'t'}, $win_size);
 }
 
@@ -335,7 +296,7 @@ if ($config{show_scale}) {
 foreach (split(/;/, $config{'type_to_draw'})){
     $_=~ /([^=]+)=([^=]+)=?(\d*)/;
 
-    print "type = $1\tstrand = $2\n" if $config{debug};
+    print "type = $1\tstrand = $2\n" if $d;
 	
 	if ($3) {$gffTypes{$1}{colour} = $3;}
 	else    {$gffTypes{$1}{colour} = $colour_scale;}
@@ -348,7 +309,7 @@ foreach (split(/;/, $config{'type_to_draw'})){
 }
 #$paternType =~ s/\|$//g;
 $paternType .= 'centromere)';
-print "Patern Regexp = $paternType\n" if $config{debug};
+print "Patern Regexp = $paternType\n" if $d;
 
 
 # 7 Foreach file draw strand(s)
@@ -376,7 +337,7 @@ while (<GFF>) {
         $chr_length = floor($chr_length_reel/$scale_factor);
         
         # 7.1 Load GFF
-        print "Loading $seqName ...\n"  if $config{verbose};
+        print "Loading $seqName ...\n"  if $v;
         
         foreach (keys(%gffTypes)){
             $gffTypes{$_}{'-'}  = [];
@@ -493,56 +454,92 @@ sub processData{
     # 7.4 Set Offset
     foreach (@type_array){
         if ($gffTypes{$_}{'strand'} eq "-")     {
-            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-'}{'x'} = $margin{'l'}
+			                      + ($count * $strand_width)
+								  + ($count * $strand_space)
+								  - ($countGff * $strand_space)
+								  + ($countGff * $space_chr);
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
-            print "x = $offset{$_}{'-'}{'x'}\ny = $offset{$_}{'-'}{'y'}\n" if $config{debug};
+            print "x = $offset{$_}{'-'}{'x'}\ny = $offset{$_}{'-'}{'y'}\n" if $d;
         }
         elsif ($gffTypes{$_}{'strand'} eq "+")     {
-            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'+'}{'x'} = $margin{'l'}
+			                      + ($count * $strand_width)
+								  + ($count * $strand_space)
+								  - ($countGff * $strand_space)
+								  + ($countGff * $space_chr);
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+            print "+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $d;
         }
         elsif ($gffTypes{$_}{'strand'} eq "both")  {
-            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-'}{'x'} = $margin{'l'}
+			                      + ($count * $strand_width)
+								  + ($count * $strand_space)
+								  - ($countGff * $strand_space)
+								  + ($countGff * $space_chr);
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
-            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'+'}{'x'} = $margin{'l'}
+			                      + ($count * $strand_width)
+								  + ($count * $strand_space)
+								  - ($countGff * $strand_space)
+								  + ($countGff * $space_chr);
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "+ = $offset{$_}{'-'}{'x'}\n+ = $offset{$_}{'-'}{'y'}\n- = $offset{$_}{'+'}{'x'}\n- = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+            print "+ = $offset{$_}{'-'}{'x'}\n+ = $offset{$_}{'-'}{'y'}\n- = $offset{$_}{'+'}{'x'}\n- = $offset{$_}{'+'}{'y'}\n" if $d;
         }
         elsif ($gffTypes{$_}{'strand'} eq "fused") {
-            $offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-+'}{'x'} = $margin{'l'}
+								   + ($count * $strand_width)
+								   + ($count * $strand_space)
+								   - ($countGff * $strand_space)
+								   + ($countGff * $space_chr);
             $offset{$_}{'-+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "f = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n" if $config{debug};
+            print "f = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n" if $d;
         }
         elsif ($gffTypes{$_}{'strand'} eq "all")   {
-            $offset{$_}{'-'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-'}{'x'} = $margin{'l'}
+								  + ($count * $strand_width)
+								  + ($count * $strand_space)
+								  - ($countGff * $strand_space)
+								  + ($countGff * $space_chr);
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
-            $offset{$_}{'-+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'-+'}{'x'} = $margin{'l'}
+								   + ($count * $strand_width)
+								   + ($count * $strand_space)
+								   - ($countGff * $strand_space)
+								   + ($countGff * $space_chr);
             $offset{$_}{'-+'}{'y'} = $margin{'t'};
             $count++;
             
-            $offset{$_}{'+'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+            $offset{$_}{'+'}{'x'} = $margin{'l'}
+								  + ($count * $strand_width)
+								  + ($count * $strand_space)
+								  - ($countGff * $strand_space)
+								  + ($countGff * $space_chr);
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "- = $offset{$_}{'-'}{'x'}\n- = $offset{$_}{'-'}{'y'}\nf = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $config{debug};
+            print "- = $offset{$_}{'-'}{'x'}\n- = $offset{$_}{'-'}{'y'}\nf = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $d;
         }
     }
     
     if ($config{gc}){
-        $offset{'gc'}{'x'} = $margin{'l'} + ($count * $strand_width) + ($count * $strand_space) - ($countGff * $strand_space) + ($countGff * $space_chr);
+        $offset{'gc'}{'x'} = $margin{'l'}
+		                   + ($count * $strand_width)
+						   + ($count * $strand_space)
+						   - ($countGff * $strand_space)
+						   + ($countGff * $space_chr);
         $offset{'gc'}{'y'} = $margin{'t'};
         $count++;
     }
@@ -554,7 +551,7 @@ sub processData{
             print "strand = $strand\n" if $config{'debug'};
             
             my $ref_tab = $gffTypes{$typeToDraw}{$strand};
-            my $cs = $gffTypes{$typeToDraw}{colour};
+            my $cs      = $gffTypes{$typeToDraw}{colour};
     
             drawPixels(\$image, \%rand, $cs, $seqName, $chr_length, $scale_factor, $typeToDraw, $strand, $strand, \%centromere, $ref_tab, $win_size);        
         }
@@ -656,14 +653,14 @@ sub drawScale{
     my $basesPerTicks = 10;
 
     # Search the number of tick to use
-    print "Start searching num ticks\n" if $config{debug};
+    print "Start searching num ticks\n" if $d;
     while (1) {
         $numTicks = floor($chr_size/$basesPerTicks);
-        print "basesPerTicks = $basesPerTicks \t numTicks = $numTicks\n"  if $config{debug};
+        print "basesPerTicks = $basesPerTicks \t numTicks = $numTicks\n"  if $d;
         last if ($numTicks <= $maxTicks);
         $basesPerTicks*=10; 
     }
-    print "Found num ticks\n" if $config{debug};
+    print "Found num ticks\n" if $d;
     
     # Define the 10^x bases to use as unit
     my $power = floor(log10($basesPerTicks*$basesPerPixel));
@@ -692,7 +689,7 @@ sub drawScale{
                    $color{'black'});
     
     # Draw scale
-    print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop, $widthScale - 8, $marginTop + $chr_size, \$color{'black'})\;\n" if $config{debug};
+    print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop, $widthScale - 8, $marginTop + $chr_size, \$color{'black'})\;\n" if $d;
     $$ref_img->filledRectangle($widthScale - 10,
                             $marginTop,
                             $widthScale - 8,
@@ -708,7 +705,7 @@ sub drawScale{
                    $marginTop + $chr_size * $win_size,
                    $string,
                    $color{'black'});
-    print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + $chr_size - 1, $widthScale, $marginTop + $chr_size, \$color{'black'})\;\n" if $config{debug};
+    print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + $chr_size - 1, $widthScale, $marginTop + $chr_size, \$color{'black'})\;\n" if $d;
     $$ref_img->filledRectangle($widthScale - 10,
                             $marginTop + $chr_size * $win_size - 1,
                             $widthScale,
@@ -725,7 +722,7 @@ sub drawScale{
                        $string,
                        $color{'black'});
          
-        print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + ($basesPerTicks * $currentTick), $widthScale, $marginTop + ($basesPerTicks * $currentTick) + 1, \$color{'black'})\;\n" if $config{debug};
+        print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + ($basesPerTicks * $currentTick), $widthScale, $marginTop + ($basesPerTicks * $currentTick) + 1, \$color{'black'})\;\n" if $d;
         $$ref_img->filledRectangle($widthScale - 10,
                                 $marginTop + ($basesPerTicks * $currentTick) * $win_size,
                                 $widthScale,
