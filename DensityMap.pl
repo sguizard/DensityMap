@@ -113,8 +113,8 @@ my $countGff = -1;
 my $font;
 
 
-print "gffs : $config{input}\n" if $v;
-print "output_img_name : $config{output_img_name}\n" if $v;
+printv("gffs : $config{input}");
+printv("output_img_name : $config{output_img_name}");
 ##> Setting parameters
 
 
@@ -148,7 +148,7 @@ if ($config{fasta}){
 
 # 1. Get Image size
 ## 1.1 Height (+Check GFF validity)
-print "Searching Max Sequence Length ... \n" if $d;
+printd("Searching Max Sequence Length ... ");
 
 my $numOfGff          = 0;
 my $maxSequenceLength = 0;
@@ -285,9 +285,9 @@ if ($config{title}){
     }
 }
 if ($config{show_scale}) {
-    print "Drawing Scale ...\n" if $v;
+    printv("Drawing Scale ...");
     my $scale_size = floor($maxSequenceLength/$scale_factor);
-    print "Scale_size : $scale_size\n" if $d;
+    printd("Scale_size : $scale_size");
     drawScale(\$image, $scale_size, $maxSequenceLength, $scaleAddWidth, $scale_factor, $numMaxTicks, $margin{'t'}, $win_size);
 }
 
@@ -296,7 +296,7 @@ if ($config{show_scale}) {
 foreach (split(/;/, $config{'type_to_draw'})){
     $_=~ /([^=]+)=([^=]+)=?(\d*)/;
 
-    print "type = $1\tstrand = $2\n" if $d;
+    printd("type = $1\tstrand = $2\n");
 	
 	if ($3) {$gffTypes{$1}{colour} = $3;}
 	else    {$gffTypes{$1}{colour} = $colour_scale;}
@@ -309,7 +309,7 @@ foreach (split(/;/, $config{'type_to_draw'})){
 }
 #$paternType =~ s/\|$//g;
 $paternType .= 'centromere)';
-print "Patern Regexp = $paternType\n" if $d;
+printd("Patern Regexp = $paternType");
 
 
 # 7 Foreach file draw strand(s)
@@ -337,7 +337,7 @@ while (<GFF>) {
         $chr_length = floor($chr_length_reel/$scale_factor);
         
         # 7.1 Load GFF
-        print "Loading $seqName ...\n"  if $v;
+        printv("Loading $seqName ...");
         
         foreach (keys(%gffTypes)){
             $gffTypes{$_}{'-'}  = [];
@@ -462,7 +462,7 @@ sub processData{
             $offset{$_}{'-'}{'y'} = $margin{'t'};
             $count++;
             
-            print "x = $offset{$_}{'-'}{'x'}\ny = $offset{$_}{'-'}{'y'}\n" if $d;
+            printd("x = $offset{$_}{'-'}{'x'}\ny = $offset{$_}{'-'}{'y'}");
         }
         elsif ($gffTypes{$_}{'strand'} eq "+")     {
             $offset{$_}{'+'}{'x'} = $margin{'l'}
@@ -473,7 +473,7 @@ sub processData{
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $d;
+            printd("+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}");
         }
         elsif ($gffTypes{$_}{'strand'} eq "both")  {
             $offset{$_}{'-'}{'x'} = $margin{'l'}
@@ -492,7 +492,7 @@ sub processData{
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "+ = $offset{$_}{'-'}{'x'}\n+ = $offset{$_}{'-'}{'y'}\n- = $offset{$_}{'+'}{'x'}\n- = $offset{$_}{'+'}{'y'}\n" if $d;
+            printd("+ = $offset{$_}{'-'}{'x'}\n+ = $offset{$_}{'-'}{'y'}\n- = $offset{$_}{'+'}{'x'}\n- = $offset{$_}{'+'}{'y'}");
         }
         elsif ($gffTypes{$_}{'strand'} eq "fused") {
             $offset{$_}{'-+'}{'x'} = $margin{'l'}
@@ -503,7 +503,7 @@ sub processData{
             $offset{$_}{'-+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "f = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n" if $d;
+            printd("f = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}");
         }
         elsif ($gffTypes{$_}{'strand'} eq "all")   {
             $offset{$_}{'-'}{'x'} = $margin{'l'}
@@ -530,7 +530,7 @@ sub processData{
             $offset{$_}{'+'}{'y'} = $margin{'t'};
             $count++;
             
-            print "- = $offset{$_}{'-'}{'x'}\n- = $offset{$_}{'-'}{'y'}\nf = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}\n" if $d;
+            printd("- = $offset{$_}{'-'}{'x'}\n- = $offset{$_}{'-'}{'y'}\nf = $offset{$_}{'-+'}{'x'}\nf = $offset{$_}{'-+'}{'y'}\n+ = $offset{$_}{'+'}{'x'}\n+ = $offset{$_}{'+'}{'y'}");
         }
     }
     
@@ -653,14 +653,14 @@ sub drawScale{
     my $basesPerTicks = 10;
 
     # Search the number of tick to use
-    print "Start searching num ticks\n" if $d;
+    printd("Start searching num ticks");
     while (1) {
         $numTicks = floor($chr_size/$basesPerTicks);
-        print "basesPerTicks = $basesPerTicks \t numTicks = $numTicks\n"  if $d;
+        printd("basesPerTicks = $basesPerTicks \t numTicks = $numTicks");
         last if ($numTicks <= $maxTicks);
         $basesPerTicks*=10; 
     }
-    print "Found num ticks\n" if $d;
+    printd("Found num ticks");
     
     # Define the 10^x bases to use as unit
     my $power = floor(log10($basesPerTicks*$basesPerPixel));
@@ -689,7 +689,7 @@ sub drawScale{
                    $color{'black'});
     
     # Draw scale
-    print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop, $widthScale - 8, $marginTop + $chr_size, \$color{'black'})\;\n" if $d;
+    printd("\$\$ref_img->filledRectangle($widthScale - 10, $marginTop, $widthScale - 8, $marginTop + $chr_size, \$color{'black'})\;");
     $$ref_img->filledRectangle($widthScale - 10,
                             $marginTop,
                             $widthScale - 8,
@@ -705,7 +705,7 @@ sub drawScale{
                    $marginTop + $chr_size * $win_size,
                    $string,
                    $color{'black'});
-    print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + $chr_size - 1, $widthScale, $marginTop + $chr_size, \$color{'black'})\;\n" if $d;
+    printd("\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + $chr_size - 1, $widthScale, $marginTop + $chr_size, \$color{'black'})\;\n");
     $$ref_img->filledRectangle($widthScale - 10,
                             $marginTop + $chr_size * $win_size - 1,
                             $widthScale,
@@ -722,7 +722,7 @@ sub drawScale{
                        $string,
                        $color{'black'});
          
-        print "\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + ($basesPerTicks * $currentTick), $widthScale, $marginTop + ($basesPerTicks * $currentTick) + 1, \$color{'black'})\;\n" if $d;
+        printd("\$\$ref_img->filledRectangle($widthScale - 10, $marginTop + ($basesPerTicks * $currentTick), $widthScale, $marginTop + ($basesPerTicks * $currentTick) + 1, \$color{'black'})\;");
         $$ref_img->filledRectangle($widthScale - 10,
                                 $marginTop + ($basesPerTicks * $currentTick) * $win_size,
                                 $widthScale,
@@ -1018,6 +1018,43 @@ sub drawPixelsGC{
     print "Finish Drawing pixels.\n" if $config{'verbose'};
 }
 
+###########################################################################
+sub openr{
+    my $file = shift;
+    
+    open my $fh, "<", $file or printError("ERROR : Cannot open $file ! \n", 1);
+    return $fh;
+}
+
+###########################################################################
+sub openw{
+    my $file = shift;
+    
+    open my $fh, ">", $file or printError("ERROR : Cannot open $file ! \n", 1);
+    return $fh;
+}
+
+###########################################################################
+sub sortedKeys{
+    my $hashRef = shift;
+    
+    return sort {$a cmp $b} (keys %$hashRef);
+}
+
+###########################################################################
+sub printv{
+    my $str = shift;
+    
+    print "$str\n" if $v;
+}
+
+###########################################################################
+sub printd{
+    my $str = shift;
+    $str = " " if (!$str);
+    
+    print STDERR "DEBUG: $str\n" if $d;
+}
 ###########################################################################
 sub printError{
     my $string = shift;
