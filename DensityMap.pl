@@ -24,6 +24,7 @@ my %config;
 GetOptions (\%config,
             'input=s',
             'region_file=s',
+			'size_file=s',
 			'fasta=s',
             'type_to_draw=s',
             'output_img_name=s',
@@ -81,9 +82,17 @@ $offset{'x1'} = 0;
 $offset{'y1'} = 0;
 $offset{'x2'} = 0;
 $offset{'y2'} = 0;
+my %listChr;
 
 $| = 1;
 
+# Files
+my $input_file			  =  $config{input_file};
+my $region_file			  =  $config{region_file};
+my $size_file			  =  $config{size_file};
+my $fasta_file			  =  $config{fasta};
+
+# Graphic options
 my $scale_factor          = ($config{auto_scale_factor})     ? 1 : ($config{scale_factor}) ? $config{scale_factor} : 1000;
 my $numMaxTicks           = ($config{show_scale})            ? $config{show_scale}            : 50;
 my $strand_width          = ($config{str_width})             ? $config{str_width}             : 50;
@@ -99,6 +108,7 @@ my $gc_cs                 = ($config{gc})                    ? $config{gc}      
 my $win_size              = ($config{win_size})              ? $config{win_size}              : 1;
 my $rounding_method       = ($config{rounding_method})       ? $config{rounding_method}       : "floor";
 my $fts                   = ($config{ft_size})               ? $config{ft_size}               : 16;
+my $title                 = ($config{title})                 ? $config{title}                 : 0;
 my $v                     = ($config{verbose})               ? 1                              : 0;
 my $d                     = ($config{debug})                 ? 1                              : 0;
 my $paternType = "(";
@@ -112,38 +122,48 @@ my $count = 0;
 my $countGff = -1;
 my $font;
 
+my @chrOrder;
 
-printv("gffs : $config{input}");
+printv("gffs : $input_file");
 printv("output_img_name : $config{output_img_name}");
 ##> Setting parameters
 
+# -2. load chr size/order
+my $fh_size_file = openr($size_file);
+while($fh_size_file){
+	chomp;
+	my @bed = split /\t/;
+	
+	push @chrOrder, $bed[0];
+	$listChr{$bed[0]}{length} = $bed[2];
+}
+close $fh_size_file;
 
 # -1. Load region if defined
 my %region;
-if ($config{region_file}) {
-	open(REGION, "<$config{region_file}") or die "Can not open $config{region_file} ! ";
-	while (<REGION>) {
+if ($region_file) {
+	my $fh_region_file = openr($region_file);
+	while ($fh_region_file) {
 		chomp;
 		my @bed = split("\t");
 		$region{$bed[0]}{length} = $bed[2] - $bed[1];
 		$region{$bed[0]}{start}  = $bed[1];
 		$region{$bed[0]}{end}    = $bed[2];
 	}
-	close REGION;
+	close $fh_region_file;
 }
 
 # 0. Read fasta file
-my %listChr;
 my $seqHeader;
 
-if ($config{fasta}){
-	open FASTA, "<$config{fasta}";
-	while (<FASTA>){
+if ($fasta_file){
+	my $fh_fasta_file = openr($fasta_file);
+	while ($fh_fasta_file){
 		chomp;
 	    if (/>(.+)/) {$seqHeader = $1;}
 		else {$listChr{$seqHeader}{seq} .= $_;}
 	}
-	close FASTA;
+	close $fh_fasta_file;
 }
 
 # 1. Get Image size
@@ -153,11 +173,11 @@ printd("Searching Max Sequence Length ... ");
 my $numOfGff          = 0;
 my $maxSequenceLength = 0;
 
-open(GFF, "<$config{input}") or printError("Could not open $config{input}\n", 1);
+my $fh_gff_file = openr($input_file);
 my $initSeq;
 my $switchInitFasta = 0;
 
-while (<GFF>) {
+while ($fh_gff_file) {
     chomp;
     if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
         $numOfGff++;
@@ -170,11 +190,11 @@ while (<GFF>) {
     }
     elsif ($switchInitFasta) {
         $listChr{$seqHeader}{seq} .= $_;
+	}
 }
-}
-close GFF;
+close $fh_gff_file;
 
-if ($config{region_file}) {
+if ($region_file) {
 	foreach my $k (keys %region){
 	    $maxSequenceLength = ($region{$k}{length} > $maxSequenceLength) ? $region{$k}{length} : $maxSequenceLength;
 	}
@@ -186,7 +206,7 @@ else {
 }
 
 
-if ($config{title}) {$margin{'t'} += 40};
+if ($title) {$margin{'t'} += 40};
 
 
 if ($config{auto_scale_factor}) {
@@ -246,12 +266,12 @@ if (!$config{force}) {
 }
 
 # 2 Create picture
-print "Create Picture ...\n" if $config{'verbose'};
+printv("Create Picture ...");
 my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 
 # 3 Loading colors from colours.txt
-print "Load colours ...\n" if $config{'verbose'};
+printv("Load colors ...");
 open(COLOR, "<".dirname(abs_path($0))."/colours.txt") or die "Can not open colours.txt";
 while (<COLOR>) {
     next if /^#/;
@@ -262,7 +282,7 @@ close COLOR;
 
 # 4 Draw Background
 if ($config{'background'}) {
-    print "Draw background ...\n" if $config{'verbose'};
+    printv("Draw background ...");
     $image->filledRectangle(0, 0, $picWidth, $picHeight, $color{$config{'background'}});
 }
 
@@ -1072,54 +1092,54 @@ sub printUsage{
 "USAGE: DensityMap.pl -i chromosome.gff3 -ty 'match=all' -o Chromosome
     
 Options:
-    -i     | input string                Gff file (version gff3 only !)          (Mandatory)
-    -re    | region_file string          A bed file describing the regions to plot 
-                                         for each sequence to plot. Allow to plot 
-                                         sepecific region and not whole sequence.
-                                         Exemple:
-                                         seq1\t100000\t200000
-                                         seq2\t200000\t350000
-                                         Format: file.gff or \"file1.gff;file2.gff\"
-    -o     | output_img_name string      Name of the output image                (Mandatory)
-    -ty    | type_to_draw string         List of type (column 3 of gff)          (Mandatory)
-                                         to draw, strand to use and color scale
-                                         Type: match, gene, CDS, ...
-                                         Strand: - -        -> strand -
-                                                 - +        -> strand +
-                                                 - both     -> strand - and strand +
-                                                 - fused    -> Combination of strand - and strand +
-                                                 - all      -> strand - and strand + and fused
-                                         Format: \"match=all;gene=both;CDS=fused\" or
-                                                 \"match=all=7;gene=both=7;CDS=fused=10\"
+    -i     | input                 [string]    Gff file (version gff3 only !)          (Mandatory)
+    -re    | region_file           [string]    A bed file describing the regions to plot 
+                                               for each sequence to plot. Allow to plot 
+                                               sepecific region and not whole sequence.
+                                               Exemple:
+                                               seq1\t100000\t200000
+                                               seq2\t200000\t350000
+                                               Format: file.gff or \"file1.gff;file2.gff\"
+    -o     | output_img_name       [string]    Name of the output image                (Mandatory)
+    -ty    | type_to_draw          [string]    List of type (column 3 of gff)          (Mandatory)
+                                               to draw, strand to use and color scale
+                                               Type: match, gene, CDS, ...
+                                               Strand: - -        -> strand -
+                                                       - +        -> strand +
+                                                       - both     -> strand - and strand +
+                                                       - fused    -> Combination of strand - and strand +
+                                                       - all      -> strand - and strand + and fused
+                                               Format: \"match=all;gene=both;CDS=fused\" or
+                                                       \"match=all=7;gene=both=7;CDS=fused=10\"
 
 Generic options: 
-    -for   | force                       Automaticaly answer yes to picture size validation
-    -v     | verbose                     MORE text dude !!!!
-    -h     | help                        This help
+    -for   | force                 [booleen]   Automaticaly answer yes to picture size validation
+    -v     | verbose               [booleen]   MORE text dude !!!!
+    -h     | help                  [booleen]   This help
 
 Density options: 
-    -c     | colour_scale int            Color scale to use    (Default = 7)
-    -sc    | scale_factor int            = window length in bp (Default = 1000)
-    -a     | auto_scale_factor int       Max picture height in pixel
-    -ro    | rounding_method string      floor or ceil         (Default = floor)
-    -gc    | gc integer                  if set, add a density map of the GC%
+    -c     | colour_scale          [integer]   Color scale to use    (Default = 7)
+    -sc    | scale_factor          [integer]   = window length in bp (Default = 1000)
+    -a     | auto_scale_factor     [integer]   Max picture height in pixel
+    -ro    | rounding_method       [string]    floor or ceil         (Default = floor)
+    -gc    | gc                    [integer]   if set, add a density map of the GC%
 
 Graphical options: 
-    -ti    | title string                Title to print on the picture
-    -w     | win_size int                Height of window in pixel       (Default = 1)
-    -sh    | show_scale int              Draw scale, the integer indicate the maximum 
-                                         tick to print on the scale      (Default = 50)
-    -str_w | str_width int               Strand width in pixel           (Default = 50)
-    -str_s | str_space int               Space between strands in pixel  (Default = 50)
-    -sp    | space_chr int               Space between chromsomes        (Default = 50)
-    -lm    | lmargin int                 Left margin in pixel            (Default = 50)
-    -rm    | rmargin int                 Rigth margin in pixel           (Default = 50)
-    -tm    | tmargin int                 Top margin in pixel             (Default = 50)
-    -bm    | bmargin int                 Bottom margin in pixel          (Default = 50)
-    -ba    | background color            Fill Background                 (Default = no Background)
-    -la    | label_strand_rotation int   Rotation degree of strand label (Default = 0)
-    -ft_f  | ft-family string            Font to use for text            (Default = Helvetica)
-    -ft_s  | ft-size int                 Size of the font                (Default = 16)
+    -ti    | title                 [string]    Title to print on the picture
+    -w     | win_size              [integer]   Height of window in pixel       (Default = 1)
+    -sh    | show_scale            [integer]   Draw scale, the integer indicate the maximum 
+                                               tick to print on the scale      (Default = 50)
+    -str_w | str_width             [integer]   Strand width in pixel           (Default = 50)
+    -str_s | str_space             [integer]   Space between strands in pixel  (Default = 50)
+    -sp    | space_chr             [integer]   Space between chromsomes        (Default = 50)
+    -lm    | lmargin               [integer]   Left margin in pixel            (Default = 50)
+    -rm    | rmargin               [integer]   Rigth margin in pixel           (Default = 50)
+    -tm    | tmargin               [integer]   Top margin in pixel             (Default = 50)
+    -bm    | bmargin               [integer]   Bottom margin in pixel          (Default = 50)
+    -ba    | background color      [string]    Fill Background                 (Default = no Background)
+    -la    | label_strand_rotation [integer]   Rotation degree of strand label (Default = 0)
+    -ft_f  | ft-family             [string]    Font to use for text            (Default = Helvetica)
+    -ft_s  | ft-size               [integer]   Size of the font                (Default = 16)
 
 
     This program is free software: you can redistribute it and/or modify
