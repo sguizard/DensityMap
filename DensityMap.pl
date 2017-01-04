@@ -202,19 +202,50 @@ my $numOfStrand = 0;
 my @type_array;
 my %type_valid;
 
-foreach (split(/;/, $config{'type_to_draw'})){
-    if($_=~ /([^=]+)=([^=]+)/){
-        push @type_array, $1;
-        $type_valid{$1}++;
+foreach my $type_group (split(/ /, $config{'type_to_draw'})){
+	my $typeOption   = "";
+	my $keyOption    = "";
+	my $valOption    = "";
+	my $strandOption = "";
+	my $csOption     = "";
+	my $roOption     = "";
+	
+	foreach my $option (split(/&/, $type_group)){
+		$option =~ /([^=]+)=([^=]+)/;
 		
-        if    ($2 eq "-" or
-			   $2 eq "+" or
-			   $2 eq "fused"){$numOfStrand++;}
-        elsif ($2 eq "both") {$numOfStrand += 2;}
-        elsif ($2 eq "all")  {$numOfStrand += 3;}
-        else                 {printError("Type option : INVALID STRAND FORMAT, check help please.\n", 1);}
-    }
-    else {printError("Type option : INVALID FORMAT, check help please.\n", 1);}
+		my $key = lc($1);
+		my $val = $2;
+		
+		if    ($key eq "type")  {$typeOption   = $val;}
+		elsif ($key eq "key")   {$keyOption    = $val;}
+		elsif ($key eq "val")   {$valOption    = $val;}
+		elsif ($key eq "strand"){$strandOption = $val;}
+		elsif ($key eq "cs")    {$csOption     = $val;}
+		elsif ($key eq "ro")    {$roOption     = $val;}
+		else  {printError("Type option : INVALID KEY, check help please.\n", 1)}
+	}
+	
+	if (!($typeOption ^ ($keyOption && $valOption))){
+		printError("Type option : INVALID FORMAT, check help please.\n", 1);
+	}
+	
+	my $type;
+	if    ($typeOption){$type = $typeOption;}
+	elsif ($keyOption) {$type = "$keyOption=$valOption";}
+	
+	push @type_array, $type;
+	$type_valid{$type}++;
+	
+	$gffTypes{$type}{strand}   = $strandOption;
+	$gffTypes{$type}{colour}   = ($csOption) ? $csOption : $colour_scale;
+	$gffTypes{$type}{rounding} = ($roOption) ? $roOption : $rounding_method;
+	
+	if    ($strandOption eq "-" or
+		   $strandOption eq "+" or
+		   $strandOption eq "fused"){$numOfStrand++;}
+	elsif ($strandOption eq "both") {$numOfStrand += 2;}
+	elsif ($strandOption eq "all")  {$numOfStrand += 3;}
+	
 }
 
 $margin{'l'} = $margin{'l'} + $scaleAddWidth if ($config{show_scale});
@@ -289,17 +320,17 @@ if ($config{show_scale}) {
 
 
 # 6 Get Type/Strand
-printv("Parsing types ...");
-foreach (split(/;/, $config{'type_to_draw'})){
-    $_=~ /([^=]+)=([^=]+)=?(\d*)/;
-
-    printd("type = $1\tstrand = $2");
-	
-	$gffTypes{$1}{colour} = ($3) ? $3 : $colour_scale;
-    $gffTypes{$1}{strand} = $2;
-
-}
-printd();
+#printv("Parsing types ...");
+#foreach (split(/;/, $config{'type_to_draw'})){
+#    $_=~ /([^=]+)=([^=]+)=?(\d*)/;
+#
+#    printd("type = $1\tstrand = $2");
+#	
+#	$gffTypes{$1}{colour} = ($3) ? $3 : $colour_scale;
+#    $gffTypes{$1}{strand} = $2;
+#
+#}
+#printd();
 
 
 
@@ -339,13 +370,17 @@ foreach my $gffFile (@gffFiles){
 		chomp;
 		
 		my @line = split /\t/;
-		my $chr         = $line[0];
-		my $type        = $line[2];
-		my $start       = $line[3];
-		my $end         = $line[4];
-		my $strand      = $line[6];
+		my $chr       = $line[0];
+		my $type      = $line[2];
+		my $start     = $line[3];
+		my $end       = $line[4];
+		my $strand    = $line[6];
+		my $attributs = $line[8];
 		
 		next if (!exists($type_valid{$type}));
+		foreach (grep {/=/} keys(%type_valid)){
+			next if ($attributs !~ /$_/)
+		}
 		
 		if (!exists($gffData{$chr}{$type})){
 			$gffData{$chr}{$type} = [];
