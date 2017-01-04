@@ -6,6 +6,7 @@ use warnings;
 use Getopt::Long;
 #use Term::ANSIColor;
 #use Data::Dumper;
+use PerlIO::gzip;
 use GD::SVG;
 use POSIX;
 use Cwd 'abs_path';
@@ -137,6 +138,7 @@ my %region;
 my @chrOrder;
 if ($region_file) {
 	my $fh_region_file = openr($region_file);
+	
 	while (<$fh_region_file>) {
 		chomp;
 		my @bed = split /\t/;
@@ -1088,8 +1090,11 @@ sub drawPixelsGC{
 ###########################################################################
 sub openr{
     my $file = shift;
-    
-    open my $fh, "<", $file or printError("ERROR : Cannot open $file ! \n", 1);
+	my $fh;
+	
+	if ($file =~ /\.gz$/){open $fh, "<:gzip", $file or printError("ERROR : Cannot open $file ! \n", 1);}
+    else                 {open $fh, "<",      $file or printError("ERROR : Cannot open $file ! \n", 1);}
+	
     return $fh;
 }
 
