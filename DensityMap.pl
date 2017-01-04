@@ -169,7 +169,7 @@ if ($fasta_file){
 ## 1.1 Height
 printd("Searching Max Sequence Length ... ");
 
-my $numOfGff          = scalar(@gffFiles);
+my $numOfGff          = scalar(@chrOrder);
 my $maxSequenceLength = 0;
 
 foreach my $k (keys %region){
@@ -297,20 +297,37 @@ foreach (split(/;/, $config{'type_to_draw'})){
 	
 	$gffTypes{$1}{colour} = ($3) ? $3 : $colour_scale;
     $gffTypes{$1}{strand} = $2;
-    $gffTypes{$1}{'-'}    = [];
-    $gffTypes{$1}{'+'}    = [];
-    $gffTypes{$1}{'-+'}   = [];
 
-    #$paternType .= $1.'|';
 }
 printd();
-#$paternType =~ s/\|$//g;
-#$paternType .= 'centromere)';
-#printd("Patern Regexp = $paternType");
+
 
 
 # 7.-1 Load gff files
 printv("Reading GFF files ...");
+
+# An annotation will be stored only if it's in the region to plot (describe region bed file)
+# 6 cases are possible: 
+#   #1 Annot start and end are before region's start
+#   #2 Annot start is before region's start, Annot end is in the region
+#   #3 Annot start is before region's start, Annot end is after region end
+#   #4 Annot start is in the region, Annot end is in the region
+#   #5 Annot start is in the region, Annot end  is after region end
+#   #6 Annot start and end are after region's end
+
+#######################################################
+################### Possibles Cases ################### x <- annot start 
+####################################################### + <- annot end 
+#          Start                         End          # <-<-<- Region
+#######################################################
+#1   x   +   |                            ]           # 
+#2     x     |              +             ]           # 
+#3     x     |                            |     +     # 
+#4           |       x             +      ]           # 
+#5           |              x             ]     +     # 
+#6           |                            ]   x   +   # 
+#######################################################
+
 my %gffData;
 my $types_pattern = join " ", @type_array;
 foreach my $gffFile (@gffFiles){
@@ -334,7 +351,26 @@ foreach my $gffFile (@gffFiles){
 			$gffData{$chr}{$type} = [];
 		}
 		else {
-			push @{$gffData{$chr}{$type}}, [$strand, $start, $end];
+			if ($start < $region{$chr}{start}){ # 1 or 2 or 3
+				if ($end < $region{$chr}{start}){ # 1
+					next;
+				}
+				elsif ($end <= $region{$chr}{end}){ # 2
+					push @{$gffData{$chr}{$type}}, [$strand, $region{$chr}{start}, $end];
+				}
+				elsif ($end > $region{$chr}{end}){ # 3
+					push @{$gffData{$chr}{$type}}, [$strand, $region{$chr}{start}, $region{$chr}{end}];
+				}
+			}
+			elsif ($start < $region{$chr}{end}){ # 4 or 5
+				if ($end <= $region{$chr}{end}){
+					push @{$gffData{$chr}{$type}}, [$strand, $start, $end]; # 4
+				}
+				elsif ($end > $region{$chr}{end}){
+					push @{$gffData{$chr}{$type}}, [$strand, $start, $region{$chr}{end}]; # 5
+				}
+			}
+			else {next;} # 6
 		}
 	}
 	close $fh_g;
@@ -736,7 +772,7 @@ sub drawPixels{
     #   - $ref_gff      ->  ref of the current strand gff
     # Output: none
     
-    printv("Start Drawing pixels ...");
+    printv("======> Start Drawing pixels ...");
 	printd("drawPixels: ");
     
     my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
@@ -904,7 +940,7 @@ sub drawPixels{
     
     # close chromosome/sequence group
     $$ref_img->endGroup;
-    printv("Finish Drawing pixels.");
+    printv("======>  Finish Drawing pixels.");
 }
 
 ###########################################################################
