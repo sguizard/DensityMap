@@ -218,13 +218,29 @@ foreach my $type_group (split(/ /, $config{'type_to_draw'})){
 		my $key = lc($1);
 		my $val = $2;
 		
-		if    ($key eq "type")  {$typeOption   = $val;}
-		elsif ($key eq "key")   {$keyOption    = $val;}
-		elsif ($key eq "val")   {$valOption    = $val;}
-		elsif ($key eq "strand"){$strandOption = $val;}
-		elsif ($key eq "cs")    {$csOption     = $val;}
-		elsif ($key eq "ro")    {$roOption     = $val;}
-		else  {printError("Type option : INVALID KEY, check help please.\n", 1)}
+		if    ($key eq "type")  {$typeOption = $val;}
+		elsif ($key eq "key")   {$keyOption  = $val;}
+		elsif ($key eq "val")   {$valOption  = $val;}
+		elsif ($key eq "strand"){
+			if ($val ne "+" && $val ne "-" && $val ne "both" &&
+				$val ne "fused"            && $val ne "all"){
+				printError("Type option : INVALID STRAND VALUE, $val, check help please.\n", 1);
+			}
+			$strandOption = $val;
+		}
+		elsif ($key eq "cs"){
+			if ($val =~ /\D+/){
+				printError("Type option : INVALID CS VALUE, $val, check help please.\n", 1);
+			}
+			$csOption = $val;
+		}
+		elsif ($key eq "ro"){
+			if ($val ne "floor" && $val ne "ceil"){
+				printError("Type option : INVALID RO VALUE, $val, check help please.\n", 1);
+			}
+			$roOption = $val;
+		}
+		else  {printError("Type option : INVALID KEY, $val, check help please.\n", 1)}
 	}
 	
 	if (!($typeOption ^ ($keyOption && $valOption))){
@@ -379,10 +395,19 @@ foreach my $gffFile (@gffFiles){
 		my $strand    = $line[6];
 		my $attributs = $line[8];
 		
-		next if (!exists($type_valid{$type}));
-		foreach (grep {/=/} keys(%type_valid)){
-			next if ($attributs !~ /$_/)
+		my $boolOK = 0;
+		if (!exists($type_valid{$type})){next;}
+		else {
+			foreach (grep {/=/} keys(%type_valid)){
+				if ($attributs =~ /$_/){
+					$boolOK++;
+					$type = $_;
+					last;
+				}
+			}
 		}
+		
+		next if (!$boolOK);
 		
 		if (!exists($gffData{$chr}{$type})){
 			$gffData{$chr}{$type} = [];
@@ -425,7 +450,7 @@ print CSV "sequence\tfeature\tstart\tend\tdensity\n";
 ## TODO: reimplmente centromere support
 printv("Ploting process ...");
 foreach my $chr (@chrOrder) {
-	printv("==> Processing $chr ...");
+	printv("=> Processing $chr ...");
 	
 	processData($chr);
 	$countGff++;
@@ -499,7 +524,7 @@ sub processData{
 	printd("processData: ");
 	
 	foreach my $type (@type_array) {
-		printv("====> Processing type $type ...");
+		printv("==> Processing type $type ...");
 		@minus     = grep {$_->[0] eq "-"} @{$gffData{$chr}{$type}};
 		@plus      = grep {$_->[0] eq "+"} @{$gffData{$chr}{$type}};
 		@minusPlus =                       @{$gffData{$chr}{$type}};
@@ -811,7 +836,7 @@ sub drawPixels{
     #   - $ref_gff      ->  ref of the current strand gff
     # Output: none
     
-    printv("======> Start Drawing pixels ...");
+    printv("===> Start Drawing pixels ...");
 	printd("drawPixels: ");
     
     my ($ref_img, $ref_rand, $cs, $seqName,
@@ -981,7 +1006,7 @@ sub drawPixels{
     
     # close chromosome/sequence group
     $$ref_img->endGroup;
-    printv("======>  Finish Drawing pixels.");
+    printv("===>  Finish Drawing pixels.");
 }
 
 ###########################################################################
