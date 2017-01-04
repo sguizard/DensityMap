@@ -97,7 +97,7 @@ my $fasta_file			  =  $config{fasta};
 my $scale_factor          = ($config{auto_scale_factor})     ? 1 : ($config{scale_factor}) ? $config{scale_factor} : 1000;
 my $numMaxTicks           = ($config{show_scale})            ? $config{show_scale}            : 50;
 my $strand_width          = ($config{str_width})             ? $config{str_width}             : 50;
-my $strand_space          = ($config{str_space})             ? $config{str_space}             : 50;
+my $strand_space          = ($config{str_space})             ? $config{str_space}             : 30;
 my $space_chr             = ($config{space_chr})             ? $config{space_chr}             : 50;
    $margin{l}             = ($config{lmargin})               ? $config{lmargin}               : 50;
    $margin{r}             = ($config{rmargin})               ? $config{rmargin}               : 50;
@@ -337,22 +337,10 @@ if ($config{show_scale}) {
 }
 
 
-# 6 Get Type/Strand
-#printv("Parsing types ...");
-#foreach (split(/;/, $config{'type_to_draw'})){
-#    $_=~ /([^=]+)=([^=]+)=?(\d*)/;
-#
-#    printd("type = $1\tstrand = $2");
-#	
-#	$gffTypes{$1}{colour} = ($3) ? $3 : $colour_scale;
-#    $gffTypes{$1}{strand} = $2;
-#
-#}
-#printd();
 
 
 
-# 7.-1 Load gff files
+# 6 Load gff files
 printv("Reading GFF files ...");
 
 # An annotation will be stored only if it's in the region to plot (describe region bed file)
@@ -395,19 +383,20 @@ foreach my $gffFile (@gffFiles){
 		my $strand    = $line[6];
 		my $attributs = $line[8];
 		
-		my $boolOK = 0;
-		if (!exists($type_valid{$type})){next;}
+		my $boolCol3 = 0;
+		my $boolCol9 = 0;
+		
+		if (exists($type_valid{$type})){$boolCol3++;}
 		else {
 			foreach (grep {/=/} keys(%type_valid)){
 				if ($attributs =~ /$_/){
-					$boolOK++;
+					$boolCol9++;
 					$type = $_;
 					last;
 				}
 			}
 		}
-		
-		next if (!$boolOK);
+		next if (($boolCol3 && $boolCol9) || (!$boolCol3 && !$boolCol9));
 		
 		if (!exists($gffData{$chr}{$type})){
 			$gffData{$chr}{$type} = [];
@@ -485,28 +474,6 @@ my @text = split("\t", $image->svg);
     }    
 #}
 
-#WAS USED FOR ADDING TRANSPARENCY ON MERGED TRACKS
-#else {
-#    my $switch = 0;
-#    my $switchRotate = 0;
-#    
-#    foreach (@text){
-#        #s/stroke\-width\: 1/stroke\-width\: 0/g;
-#        s/stroke-opacity: 1.0; stroke-width: 1/stroke: none/g;
-#        if (/<g id="\-\+_\d+">/)    {$switch++;}
-#        elsif (/<\/g>/ and $switch) {$switch--;}
-#        
-#        if (/<g id="rotate_\d+">/)         {$switchRotate++;}
-#        elsif (/<\/g>/ and $switchRotate)  {$switchRotate--;}
-#        
-#        if ($switch) {
-#            s/fill-opacity: 1.0/fill-opacity: $config{transparency}/g;
-#            s/stroke-opacity: 1.0; stroke-width: 1/stroke: none/g;
-#        }
-#        if ($switchRotate) {s/x="(\d+)" y="(\d+)"/x="$1" y="$2" transform="rotate(-45, $1, $2)"/;}
-#        print IMG $_;
-#    }
-#}
 
 close IMG;
 print "Image saved ! \n";
@@ -878,7 +845,7 @@ sub drawPixels{
         printd("drawPixels: basesCoverred Tab = -".join(" ", @previousBases)."-");
         printd("drawPixels: basesCoverred = $basesCoverred (previous shift)");
         printd("drawPixels: Start while");
-        printd("drawPixels: \$gff[0]->[0] = $gff[0]->[0]");
+        printd("drawPixels: \$gff[0]->[0] = $gff[0]->[0]") if defined($gff[0]->[0]);
 		printd("drawPixels: \$pos * \$scaleFactor = ".($pos * $scaleFactor));
         #printError( "\$gff[0]->[0] undef ! \n") if(!defined($gff[0]->[0]));
         
@@ -1006,7 +973,7 @@ sub drawPixels{
     
     # close chromosome/sequence group
     $$ref_img->endGroup;
-    printv("===>  Finish Drawing pixels.");
+    printv("===> Finish Drawing pixels.");
 }
 
 ###########################################################################
@@ -1178,15 +1145,23 @@ Options:
                                                seq2\t200000\t350000
     -o     | output_img_name       [string]    Name of the output image                (Mandatory)
     -ty    | type_to_draw          [string]    List of type (column 3 of gff)          (Mandatory)
-                                               to draw, strand to use and color scale
-                                               Type: match, gene, CDS, ...
-                                               Strand: - -        -> strand -
-                                                       - +        -> strand +
-                                                       - both     -> strand - and strand +
-                                                       - fused    -> Combination of strand - and strand +
-                                                       - all      -> strand - and strand + and fused
-                                               Format: \"match=all;gene=both;CDS=fused\" or
-                                                       \"match=all=7;gene=both=7;CDS=fused=10\"
+                                               to draw, strand (str), color scale (cs), rounding_method (ro)
+                                               Type:
+											           - 3rd column -> type
+													   - 9th column -> key and val
+                                               Strand:
+												       - -     -> strand -
+                                                       - +     -> strand +
+                                                       - both  -> strand - and strand +
+                                                       - fused -> Combination of strand - and strand +
+                                                       - all   -> strand - and strand + and fused
+											   
+											   Rounding method:
+											           - floor
+													   - ceil
+													   
+                                               Format: \"type=match&str=all type=gene&str=both type=CDS&str=fused\" or
+                                                       \"key=ID&val=transposon&str=all&cs=7&ro=ceil type=gene&str=both&cs=7\"
 
 Generic options: 
     -for   | force                 [booleen]   Automaticaly answer yes to picture size validation
@@ -1198,7 +1173,7 @@ Density options:
     -sc    | scale_factor          [integer]   = window length in bp (Default = 1000)
     -a     | auto_scale_factor     [integer]   Max picture height in pixel
     -ro    | rounding_method       [string]    floor or ceil         (Default = floor)
-    -gc    | gc                    [integer]   if set, add a density map of the GC%
+    -gc    | gc                    [integer]   if set, add a density map of the GC% (fasta option must be set)
 
 Graphical options: 
     -ti    | title                 [string]    Title to print on the picture
@@ -1206,7 +1181,7 @@ Graphical options:
     -sh    | show_scale            [integer]   Draw scale, the integer indicate the maximum 
                                                tick to print on the scale      (Default = 50)
     -str_w | str_width             [integer]   Strand width in pixel           (Default = 50)
-    -str_s | str_space             [integer]   Space between strands in pixel  (Default = 50)
+    -str_s | str_space             [integer]   Space between strands in pixel  (Default = 30)
     -sp    | space_chr             [integer]   Space between chromsomes        (Default = 50)
     -lm    | lmargin               [integer]   Left margin in pixel            (Default = 50)
     -rm    | rmargin               [integer]   Rigth margin in pixel           (Default = 50)
