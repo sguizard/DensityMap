@@ -597,12 +597,14 @@ sub processData{
             printd("processData: strand = $strand");
             
             my $cs = $gffTypes{$type}{colour};
+			my $ro = $gffTypes{$type}{rounding};
 			my $ref_tab;
-			if ($strand eq "-")    {$ref_tab =\@minus;}
+			if    ($strand eq "-") {$ref_tab =\@minus;}
 			elsif ($strand eq "+") {$ref_tab =\@plus;}
 			elsif ($strand eq "-+"){$ref_tab =\@minusPlus;}
 			
-            drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor, $type, $strand, $strand, \%centromere, $ref_tab, $win_size);        
+            drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor,
+					   $type, $strand, $strand, \%centromere, $ref_tab, $win_size, $ro);
         }
     }
     
@@ -810,7 +812,9 @@ sub drawPixels{
     printv("======> Start Drawing pixels ...");
 	printd("drawPixels: ");
     
-    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $type, $strand, $strandColor, $ref_centromere, $ref_gff, $win_size) = @_;
+    my ($ref_img, $ref_rand, $cs, $seqName,
+		$chr_size, $scaleFactor, $type, $strand,
+		$strandColor, $ref_centromere, $ref_gff, $win_size, $ro) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
     my $randNum;
@@ -853,7 +857,7 @@ sub drawPixels{
         
         # while the end of gff is not reached and the next start is in the current pixel
         while (defined($gff[0]->[0]) and $gff[0]->[0] < ($pos * $scaleFactor)) {
-            my $ref_interval= shift(@gff);
+            my $ref_interval = shift(@gff);
             
             last if (!defined $ref_interval->[0]); # = defined($gff[0]->[0]) avoid warnings
             
@@ -901,8 +905,8 @@ sub drawPixels{
         
         # Compute percentage of base coverage
         my $percentage;
-        if    ($rounding_method eq "floor") {$percentage = floor(($basesCoverred/$scaleFactor) * 100);}
-        elsif ($rounding_method eq "ceil" ) {$percentage = ceil (($basesCoverred/$scaleFactor) * 100);}
+        if    ($ro eq "floor") {$percentage = floor(($basesCoverred/$scaleFactor) * 100);}
+        elsif ($ro eq "ceil" ) {$percentage = ceil (($basesCoverred/$scaleFactor) * 100);}
         
         printd("drawPixels: percentage = $basesCoverred/$scaleFactor = ".($basesCoverred/$scaleFactor));
         printd("drawPixels: percentage = $percentage % \n");
@@ -914,14 +918,14 @@ sub drawPixels{
         
         # Draw the current pixel
 	if ($config{region_file}) {
-		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                    $offset{$type}{$strand}{'y'} + $posPic * $win_size,
-        	                           $offset{$type}{$strand}{'x'} + $strand_width,    $offset{$type}{$strand}{'y'} + $posPic * $win_size + $win_size,
-        	                           $color{"${cs}_heatmap$percentage"});
+		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $posPic * $win_size,
+        	                       $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $posPic * $win_size + $win_size,
+        	                       $color{"${cs}_heatmap$percentage"});
 	}
 	else {
-		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                    $offset{$type}{$strand}{'y'} + $pos * $win_size,
-        	                           $offset{$type}{$strand}{'x'} + $strand_width,    $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
-        	                           $color{"${cs}_heatmap$percentage"});
+		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
+        	                       $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
+        	                       $color{"${cs}_heatmap$percentage"});
 	}
 
 	my $st = $pos * $scaleFactor;
