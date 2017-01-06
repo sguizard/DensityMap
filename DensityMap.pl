@@ -208,6 +208,7 @@ foreach my $type_group (split(/ /, $config{'type_to_draw'})){
 	my $typeOption   = "";
 	my $keyOption    = "";
 	my $valOption    = "";
+	my $labOption    = "";
 	my $strandOption = "";
 	my $csOption     = "";
 	my $roOption     = "";
@@ -221,6 +222,7 @@ foreach my $type_group (split(/ /, $config{'type_to_draw'})){
 		if    ($key eq "type")  {$typeOption = $val;}
 		elsif ($key eq "key")   {$keyOption  = $val;}
 		elsif ($key eq "val")   {$valOption  = $val;}
+		elsif ($key eq "lab")   {$labOption  = $val;}
 		elsif ($key eq "strand"){
 			if ($val ne "+" && $val ne "-" && $val ne "both" &&
 				$val ne "fused"            && $val ne "all"){
@@ -255,8 +257,9 @@ foreach my $type_group (split(/ /, $config{'type_to_draw'})){
 	$type_valid{$type}++;
 	
 	$gffTypes{$type}{strand}   = $strandOption;
-	$gffTypes{$type}{colour}   = ($csOption) ? $csOption : $colour_scale;
-	$gffTypes{$type}{rounding} = ($roOption) ? $roOption : $rounding_method;
+	$gffTypes{$type}{colour}   = ($csOption)  ? $csOption  : $colour_scale;
+	$gffTypes{$type}{rounding} = ($roOption)  ? $roOption  : $rounding_method;
+	$gffTypes{$type}{label}    = ($labOption) ? $labOption : $type;
 	
 	if    ($strandOption eq "-" or
 		   $strandOption eq "+" or
@@ -592,13 +595,15 @@ sub processData{
             
             my $cs = $gffTypes{$type}{colour};
 			my $ro = $gffTypes{$type}{rounding};
+			my $la = $gffTypes{$type}{label};
 			my $ref_tab;
+			
 			if    ($strand eq "-") {$ref_tab =\@minus;}
 			elsif ($strand eq "+") {$ref_tab =\@plus;}
 			elsif ($strand eq "-+"){$ref_tab =\@minusPlus;}
 			
             drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor,
-					   $type, $strand, $strand, \%centromere, $ref_tab, $win_size, $ro);
+					   $type, $strand, $strand, \%centromere, $ref_tab, $win_size, $ro, $la);
         }
     }
     
@@ -807,8 +812,8 @@ sub drawPixels{
 	printd("drawPixels: ");
     
     my ($ref_img, $ref_rand, $cs, $seqName,
-		$chr_size, $scaleFactor, $type, $strand,
-		$strandColor, $ref_centromere, $ref_gff, $win_size, $ro) = @_;
+		$chr_size, $scaleFactor, $type, $strand, $strandColor,
+		$ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
     my $randNum;
@@ -957,9 +962,9 @@ sub drawPixels{
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($type) * gdLargeFont->width)/2), 
+                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($la) * gdLargeFont->width)/2), 
                    $offset{$type}{$strand}{'y'} - (2 * gdLargeFont->height), 
-                   $type,
+                   $la,
                    $color{'black'});
     # Close label group for next rotation
     $$ref_img->endGroup;
