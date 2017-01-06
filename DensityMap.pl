@@ -23,11 +23,12 @@ use File::Basename;
 ##> Define options
 my %config;
 my @gffFiles;
+my @typeArray;
 GetOptions (\%config,
             'input=s' => \@gffFiles,
             'region_file=s',
 			'fasta=s',
-            'type_to_draw=s',
+            'type_to_draw=s' => \@typeArray,
             'output_img_name=s',
             'rounding_method=s',
             'show_scale=i',
@@ -63,7 +64,7 @@ if ($config{help}) {printUsage(1);}
 if (!scalar(@gffFiles))               {printError ("\n!!!! input is MANDATORY !!!!! \n\n\n", 0);                 printUsage(1);}
 if (!exists $config{output_img_name}) {printError ("\n!!!! output_img_name is MANDATORY !!!!! \n\n\n", 0);       printUsage(1);}
 if (!exists $config{region_file})     {printError ("\n!!!! region_file is MANDATORY !!!!! \n\n\n", 0);           printUsage(1);}
-if (!exists $config{type_to_draw})    {printError ("\n!!!! type_to_draw options is  MANDATORY !!!!! \n\n\n", 0); printUsage(1);}
+if (!scalar(@typeArray))              {printError ("\n!!!! type_to_draw options is  MANDATORY !!!!! \n\n\n", 0); printUsage(1);}
 #if (! -e $config{input})                  {printError ("gff $config{input} not exist ! \n"); printUsage(1);}
 
 ##> Setting Global Variables
@@ -204,7 +205,7 @@ my $numOfStrand = 0;
 my @type_array;
 my %type_valid;
 
-foreach my $type_group (split(/ /, $config{'type_to_draw'})){
+foreach my $type_group (@typeArray){
 	my $typeOption   = "";
 	my $keyOption    = "";
 	my $valOption    = "";
