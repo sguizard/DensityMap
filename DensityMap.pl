@@ -24,10 +24,11 @@ use File::Basename;
 my %config;
 my @gffFiles;
 my @typeArray;
+my @fastaFiles;
 GetOptions (\%config,
             'input=s' => \@gffFiles,
             'region_file=s',
-			'fasta=s',
+			'fasta=s' => \@fastaFiles,
             'type_to_draw=s' => \@typeArray,
             'output_img_name=s',
             'rounding_method=s',
@@ -92,7 +93,6 @@ $| = 1;
 # Files
 #my $input_file			  =  $config{input_file};
 my $region_file			  =  $config{region_file};
-my $fasta_file			  =  $config{fasta};
 
 # Graphic options
 my $scale_factor          = ($config{auto_scale_factor})     ? 1 : ($config{scale_factor}) ? $config{scale_factor} : 1000;
@@ -154,18 +154,20 @@ if ($region_file) {
 }
 
 # 0. Read fasta file
-if ($fasta_file){
-	printv("Reading fasta file ...");
-	my $seqHeader;
-	
-	my $fh_fasta_file = openr($fasta_file);
-	
-	while ($fh_fasta_file){
-		chomp;
-	    if (/>(.+)/) {$seqHeader = $1;}
-		else         {$region{$seqHeader}{seq} .= $_;}
+if (!scalar(@fastaFiles)){
+	foreach my $fasta_file (@fastaFiles){
+		printv("Reading fasta $fasta_file ...");
+		
+		my $seqHeader;
+		my $fh_fasta_file = openr($fasta_file);
+		
+		while ($fh_fasta_file){
+			chomp;
+			if (/>(.+)/) {$seqHeader = $1;}
+			else         {$region{$seqHeader}{seq} .= $_;}
+		}
+		close $fh_fasta_file;
 	}
-	close $fh_fasta_file;
 }
 
 # 1. Get Image size
@@ -798,15 +800,19 @@ sub drawPixels{
     
     # Draw each pixel of strand
     # Input :
-    #   - $ref_img      ->  ref of the image
-    #   - $ref_rand     ->  ref on the hash of random numbers
-    #   - $ref_colour_scale  ->  colour_scale to use for colors
-    #   - $chr_size     ->  Chromosome/Sequence size
-    #   - $scaleFactor  ->  Scale_factor
-    #   - $type         ->  current to draw (label)
-    #   - $strand       ->  current strand in process (label)
-    #   - $strandColor  ->  color to use with strand
-    #   - $ref_gff      ->  ref of the current strand gff
+    #   - $ref_img			->	ref of the image
+    #   - $ref_rand			->	ref on the hash of random numbers
+    #   - $ref_colour_scale	->	colour_scale to use for colors
+	#   - $seqName			->	
+    #   - $chr_size			->	Chromosome/Sequence size
+    #   - $scaleFactor		->	Scale_factor
+    #   - $type				->	current to draw (label)
+    #   - $strand			->	current strand in process (label)
+    #   - $strandColor		->	color to use with strand
+    #   - $ref_gff			->	ref of the current strand gff
+	#   - 
+	#   - 
+	#   - 
     # Output: none
     
     printv("===> Start Drawing pixels ...");
@@ -840,7 +846,7 @@ sub drawPixels{
     my $posPic = 0;
     for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
         
-    	next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
+    	#next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
 		$posPic++;
         
 		# Get number of base covered by the previous on pixel crosssing interval
