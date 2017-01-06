@@ -842,6 +842,11 @@ sub drawPixels{
     # Open chromosome/sequence group
     $$ref_img->startGroup("${strand}_${randNum}");
     
+	# Draw Chromosome background
+	$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'},
+        	                   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + ($chr_size/$scale_factor),
+        	                   $color{"${cs}_heatmap0"});
+	
     # For each pixel of the chromosome/sequence
     my $posPic = 0;
     for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
@@ -921,22 +926,24 @@ sub drawPixels{
         # kill if more than 100 % 
         if    ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
 		elsif ($percentage < 0)   {printError("Lesser than 0 % ($percentage % )", 1);}
-        
-        # Draw the current pixel
-	if ($config{region_file}) {
-		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $posPic * $win_size,
-        	                       $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $posPic * $win_size + $win_size,
-        	                       $color{"${cs}_heatmap$percentage"});
-	}
-	else {
-		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
-        	                       $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
-        	                       $color{"${cs}_heatmap$percentage"});
-	}
-
-	my $st = $pos * $scaleFactor;
-	my $en = $pos * $scaleFactor + $scaleFactor;
-	print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
+		
+		if ($percentage != 0){
+			# Draw the current pixel
+			if ($config{region_file}) {
+				$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $posPic * $win_size,
+										   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $posPic * $win_size + $win_size,
+										   $color{"${cs}_heatmap$percentage"});
+			}
+			else {
+				$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
+										   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
+										   $color{"${cs}_heatmap$percentage"});
+			}
+		}
+		
+		my $st = $pos * $scaleFactor;
+		my $en = $pos * $scaleFactor + $scaleFactor;
+		print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
 	
     }# End # For each pixel of the chromosome/sequence
     
