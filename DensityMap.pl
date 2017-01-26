@@ -153,14 +153,14 @@ if ($region_file) {
 }
 
 # 0. Read fasta file
-if (!scalar(@fastaFiles)){
+if (@fastaFiles){
 	foreach my $fasta_file (@fastaFiles){
 		printv("Reading fasta $fasta_file ...");
 		
 		my $seqHeader;
 		my $fh_fasta_file = openr($fasta_file);
 		
-		while ($fh_fasta_file){
+		while (<$fh_fasta_file>){
 			chomp;
 			if (/>(.+)/) {$seqHeader = $1;}
 			else         {$region{$seqHeader}{seq} .= $_;}
@@ -457,14 +457,14 @@ foreach my $chr (@chrOrder) {
 	$nbChr++;
 	$countGff++;
 
-	my $nbType = scalar(@type_array);
+	my $nbType = ($config{gc}) ? (scalar(@type_array)+1) : scalar(@type_array);
 	my $strandGroupWidth = $nbType * $strand_width + ($nbType-1) * $strand_space;
 	
 	my $x = $margin{l} +
 		   ($nbChr - 1) * $strandGroupWidth +
 		   ($nbChr - 1) * $space_chr + 
 		   ($strandGroupWidth)/2;
-			
+
 	my $y = $margin{'t'};
 
 	$image->string(gdLargeFont,
@@ -831,9 +831,7 @@ sub drawPixels{
     #   - $strand			->	current strand in process (label)
     #   - $strandColor		->	color to use with strand
     #   - $ref_gff			->	ref of the current strand gff
-	#   - 
-	#   - 
-	#   - 
+	#
     # Output: none
     
     printd("===> Start Drawing pixels ...");
@@ -891,8 +889,8 @@ sub drawPixels{
                    $color{'black'});
     
 	# Draw Chromosome background
-	$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'},
-        	                   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + ($chr_size/$scale_factor),
+	$$ref_img->filledRectangle($offset{$type}{$strand}{'x'}                , $offset{$type}{$strand}{'y'} + ($region{$seqName}{start}/$scale_factor),
+        	                   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + ($region{$seqName}{end}  /$scale_factor),
         	                   $color{"${cs}_heatmap0"});
 	
 	
@@ -1010,14 +1008,14 @@ sub drawPixelsGC{
         
         # Draw the current pixel
 	if ($config{region_file}) {
-        	$$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $posPic * $win_size,
-                	                   $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $posPic * $win_size + $win_size,
-                	                   $color{"${cs}_heatmap$percentage"});
+        $$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $posPic * $win_size,
+                	               $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $posPic * $win_size + $win_size,
+                	               $color{"${cs}_heatmap$percentage"});
 	}
 	else {
 		$$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $pos * $win_size,
-                                           $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $pos * $win_size + $win_size,
-                                           $color{"${cs}_heatmap$percentage"});
+                                   $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $pos * $win_size + $win_size,
+                                   $color{"${cs}_heatmap$percentage"});
 	}
 
         my $st = $pos * $scaleFactor;
@@ -1031,11 +1029,11 @@ sub drawPixelsGC{
     $$ref_img->startGroup("rotate_$randNum");
     
     # Draw label Sequence Name
-    $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-                   $offset{gc}{'y'} - (3 * gdLargeFont->height), 
-                   $seqName,
-                   $color{'black'});
+    #$$ref_img->string(gdLargeFont,
+    #               $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+    #               $offset{gc}{'y'} - (3 * gdLargeFont->height), 
+    #               $seqName,
+    #               $color{'black'});
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
