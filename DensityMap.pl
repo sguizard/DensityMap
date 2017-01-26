@@ -24,10 +24,11 @@ use File::Basename;
 my %config;
 my @gffFiles;
 my @typeArray;
+my @fastaFiles;
 GetOptions (\%config,
             'input=s' => \@gffFiles,
             'region_file=s',
-			'fasta=s',
+			'fasta=s' => \@fastaFiles,
             'type_to_draw=s' => \@typeArray,
             'output_img_name=s',
             'rounding_method=s',
@@ -92,7 +93,6 @@ $| = 1;
 # Files
 #my $input_file			  =  $config{input_file};
 my $region_file			  =  $config{region_file};
-my $fasta_file			  =  $config{fasta};
 
 # Graphic options
 my $scale_factor          = ($config{auto_scale_factor})     ? 1 : ($config{scale_factor}) ? $config{scale_factor} : 1000;
@@ -154,18 +154,20 @@ if ($region_file) {
 }
 
 # 0. Read fasta file
-if ($fasta_file){
-	printv("Reading fasta file ...");
-	my $seqHeader;
-	
-	my $fh_fasta_file = openr($fasta_file);
-	
-	while ($fh_fasta_file){
-		chomp;
-	    if (/>(.+)/) {$seqHeader = $1;}
-		else         {$region{$seqHeader}{seq} .= $_;}
+if (!scalar(@fastaFiles)){
+	foreach my $fasta_file (@fastaFiles){
+		printv("Reading fasta $fasta_file ...");
+		
+		my $seqHeader;
+		my $fh_fasta_file = openr($fasta_file);
+		
+		while ($fh_fasta_file){
+			chomp;
+			if (/>(.+)/) {$seqHeader = $1;}
+			else         {$region{$seqHeader}{seq} .= $_;}
+		}
+		close $fh_fasta_file;
 	}
-	close $fh_fasta_file;
 }
 
 # 1. Get Image size
@@ -262,12 +264,18 @@ foreach my $type_group (@typeArray){
 	$gffTypes{$type}{rounding} = ($roOption)  ? $roOption  : $rounding_method;
 	$gffTypes{$type}{label}    = ($labOption) ? $labOption : $type;
 	
-	if    ($strandOption eq "-" or
-		   $strandOption eq "+" or
-		   $strandOption eq "fused"){$numOfStrand++;}
-	elsif ($strandOption eq "both") {$numOfStrand += 2;}
-	elsif ($strandOption eq "all")  {$numOfStrand += 3;}
-	
+	if ($strandOption eq "-" or $strandOption eq "+" or $strandOption eq "fused"){
+		$gffTypes{$type}{Nstrand} = 1;
+		$numOfStrand++;
+	}
+	elsif ($strandOption eq "both"){
+		$gffTypes{$type}{Nstrand} = 2;
+		$numOfStrand += 2;
+	}
+	elsif ($strandOption eq "all"){
+		$gffTypes{$type}{Nstrand} = 3;
+		$numOfStrand += 3;
+	}
 }
 
 $margin{'l'} = $margin{'l'} + $scaleAddWidth if ($config{show_scale});
@@ -447,6 +455,19 @@ foreach my $chr (@chrOrder) {
 	
 	processData($chr);
 	$countGff++;
+	
+	my $groupWidth = scalar(@typeArray) * $strand_width + (scalar(@typeArray) - 1) * $strand_space;
+	my $x = $margin{l};
+	$x += $scaleAddWidth if ($config{show_scale});
+	$x += $countGff * ($groupWidth + $space_chr);
+	
+	my $y = $margin{'t'};
+	
+	$image->string(gdLargeFont,
+				   $x + (($groupWidth/2) - (length($chr) * gdLargeFont->width)/2),
+				   $y - (3 * gdLargeFont->height),
+				   $chr,
+				   $color{'black'});
 }
 
 close CSV;
@@ -494,7 +515,7 @@ sub processData{
 	
 	printd("processData: ");
 	
-	foreach my $type (@type_array) {
+	foreach my $type (@type_array){
 		printv("==> Processing type $type ...");
 		@minus     = grep {$_->[0] eq "-"} @{$gffData{$chr}{$type}};
 		@plus      = grep {$_->[0] eq "+"} @{$gffData{$chr}{$type}};
@@ -793,30 +814,223 @@ sub drawScale{
 	printd("drawScale: ");
 }
 
-###########################################################################
+############################################################################
+#sub drawPixels{
+#    
+#    # Draw each pixel of strand
+#    # Input :
+#    #   - $ref_img			->	ref of the image
+#    #   - $ref_rand			->	ref on the hash of random numbers
+#    #   - $ref_colour_scale	->	colour_scale to use for colors
+#	#   - $seqName			->	
+#    #   - $chr_size			->	Chromosome/Sequence size
+#    #   - $scaleFactor		->	Scale_factor
+#    #   - $type				->	current to draw (label)
+#    #   - $strand			->	current strand in process (label)
+#    #   - $strandColor		->	color to use with strand
+#    #   - $ref_gff			->	ref of the current strand gff
+#	#   - 
+#	#   - 
+#	#   - 
+#    # Output: none
+#    
+#    printv("===> Start Drawing pixels ...");
+#	printd("drawPixels: ");
+#    
+#    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,
+#		$scaleFactor, $type, $strand, $strandColor,
+#		$ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
+#    my @gff    = @{$ref_gff};
+#    my %centro = %{$ref_centromere};
+#    my $randNum;
+#    my %intervals;
+#    my @previousBases = (0);
+#    
+#    # Search a unique random number
+#    while (1) {
+#        $randNum = int rand(1000);
+#        redo if $$ref_rand{$randNum}++;
+#        last;
+#    }
+#    
+#    printd("drawPixels: chr_size    = $chr_size");
+#    printd("drawPixels: scaleFactor = $scaleFactor");
+#    printd("drawPixels: type        = $type");
+#    printd("drawPixels: strand      = $strand\n");
+#    
+#    # Open chromosome/sequence group
+#    $$ref_img->startGroup("${strand}_${randNum}");
+#    
+#	# Draw Chromosome background
+#	$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'},
+#        	                   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + ($chr_size/$scale_factor),
+#        	                   $color{"${cs}_heatmap0"});
+#	
+#    # For each pixel of the chromosome/sequence
+#    for (my $pos = 0 ; $pos <= $chr_size ; $pos++){
+#        
+#		# Get number of base covered by the previous on pixel crosssing interval
+#        my $basesCoverred = shift @previousBases;
+#        $basesCoverred = 0 if (!defined $basesCoverred); # if @previousBases is empty
+#        
+#        printd("drawPixels: pos = $pos");
+#        printd("drawPixels: basesCoverred Tab = -".join(" ", @previousBases)."-");
+#        printd("drawPixels: basesCoverred = $basesCoverred (previous shift)");
+#        printd("drawPixels: Start searching all intervals in the window");
+#        printd("drawPixels: \$gff[0]->[0] = $gff[0]->[0]") if defined($gff[0]->[0]);
+#		printd("drawPixels: \$pos * \$scaleFactor = ".($pos * $scaleFactor));
+#        
+#        # while the end of gff is not reached and the next start is in the current pixel
+#        while (defined($gff[0]->[0]) and $gff[0]->[0] < ($pos * $scaleFactor)) {
+#            my $ref_interval = shift(@gff);
+#            
+#            last if (!defined $ref_interval->[0]); # = defined($gff[0]->[0]) avoid warnings
+#            
+#            # get clearly start and end 
+#            $intervals{'start_reel'}  = $ref_interval->[0];
+#            $intervals{'end_reel'}    = $ref_interval->[1];
+#			
+#            printd("drawPixels: \tstart_reel = $intervals{'start_reel'}");
+#            printd("drawPixels: \tend_reel   = $intervals{'end_reel'}");
+#            printd("drawPixels: \tcheck position");
+#            
+#            # feature end is on current pixel
+#            if ($intervals{'end_reel'} < ($pos * $scaleFactor) ){ 
+#                printd("drawPixels: \tCase 1 : \$basesCoverred += $intervals{'end_reel'} - $intervals{'start_reel'}");
+#                printd("drawPixels: \tCase 1 : \$basesCoverred += ".($intervals{'end_reel'} - $intervals{'start_reel'}));
+#                $basesCoverred += $intervals{'end_reel'} - $intervals{'start_reel'}; # increment the base counting
+#            }
+#            
+#            # feature end is on next pixels
+#            else{
+#                # determine on how much pixel the interval is crossing
+#                my $numPixelImpliy = floor(($intervals{'end_reel'} - $intervals{'start_reel'} - (($pos * $scaleFactor) - $intervals{'start_reel'}))/$scaleFactor);
+#                
+#                # Treating current position
+#                $basesCoverred += ($pos * $scaleFactor) - $intervals{'start_reel'}; 
+#                #printd("drawPixels: \tCase 2 : \$basesCoverred += ($pos * $scaleFactor) - $intervals{'start_reel'}");
+#                
+#                # Treating the next full pixels 
+#                for (my $i = 0 ; $i < $numPixelImpliy ; $i++){
+#                    printd("drawPixels: \tCase 2 : \$previousBases[$i] += $scaleFactor");
+#                    $previousBases[$i] += $scaleFactor;
+#                }
+#                
+#                # Treat the last not full pixel
+#                $previousBases[$numPixelImpliy] += (($intervals{'end_reel'} - $intervals{'start_reel'} - (($pos * $scaleFactor) - $intervals{'start_reel'}))%$scaleFactor);
+#                printd("drawPixels: \tCase 2 : \$previousBases[$numPixelImpliy] += (($intervals{'end_reel'} - $intervals{'start_reel'} - (($pos * $scaleFactor) - $intervals{'start_reel'}))%$scaleFactor);");
+#                
+#            }# feature end is on next pixels
+#            
+#            printd("drawPixels: \tbasesCoverred = $basesCoverred");
+#            
+#        }# while ($intervalsTabM[0]->[0] < ($pos * $scaleFactor))
+#        
+#        printd("drawPixels: Stop searching all intervals in the window");
+#        
+#        # Compute percentage of base coverage
+#        my $percentage;
+#        if    ($ro eq "floor") {$percentage = floor(($basesCoverred/$scaleFactor) * 100);}
+#        elsif ($ro eq "ceil" ) {$percentage = ceil (($basesCoverred/$scaleFactor) * 100);}
+#        
+#        printd("drawPixels: percentage = $basesCoverred/$scaleFactor = ".($basesCoverred/$scaleFactor));
+#        printd("drawPixels: percentage = $percentage % \n");
+#        #print "$pos = ${cs}_heatmap$percentage\n" if $config{insaneDebugMode};
+#        
+#        # kill if more than 100 % 
+#        if    ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
+#		elsif ($percentage < 0)   {printError("Lesser than 0 % ($percentage % )", 1);}
+#		
+#		if ($percentage != 0){
+#			# Draw the current pixel
+#			$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
+#									   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
+#									   $color{"${cs}_heatmap$percentage"});
+#		}
+#		
+#		my $st = $pos * $scaleFactor;
+#		my $en = $pos * $scaleFactor + $scaleFactor;
+#		print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
+#		
+#    }# End # For each pixel of the chromosome/sequence
+#    
+#    # Draw Centromere
+#    if (defined($centro{start})) {
+#        #Left Triangle
+#        my $poly = new GD::Polygon;
+#        $poly->addPt($offset{$type}{$strand}{'x'} - 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{start}/$scaleFactor));
+#        $poly->addPt($offset{$type}{$strand}{'x'} - 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{end}  /$scaleFactor));
+#        $poly->addPt(($offset{$type}{$strand}{'x'} + $strand_width/2), ($offset{$type}{$strand}{'y'} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+#        $$ref_img->filledPolygon($poly, $color{$config{'background'}});
+#        
+#        #Right Triangle
+#        $poly = new GD::Polygon;
+#        $poly->addPt($offset{$type}{$strand}{'x'} + $strand_width + 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{start}/$scaleFactor));
+#        $poly->addPt($offset{$type}{$strand}{'x'} + $strand_width + 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{end}  /$scaleFactor));
+#        $poly->addPt(($offset{$type}{$strand}{'x'} + $strand_width/2), ($offset{$type}{$strand}{'y'} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+#        $$ref_img->filledPolygon($poly, $color{$config{'background'}});
+#    }
+#    
+#    # Open label group for next rotation 
+#    $$ref_img->startGroup("rotate_$randNum");
+#    
+#    # Draw label Sequence Name
+#    #$$ref_img->string(gdLargeFont,
+#    #               $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+#    #               $offset{$type}{$strand}{'y'} - (3 * gdLargeFont->height), 
+#    #               $seqName,
+#    #               $color{'black'});
+#    
+#    # Draw label type
+#    $$ref_img->string(gdLargeFont,
+#                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($la) * gdLargeFont->width)/2), 
+#                   $offset{$type}{$strand}{'y'} - (2 * gdLargeFont->height), 
+#                   $la,
+#                   $color{'black'});
+#    # Close label group for next rotation
+#    $$ref_img->endGroup;
+#    
+#    # Draw strand label
+#    $$ref_img->string(gdLargeFont,
+#                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($strand) * gdLargeFont->width)/2), 
+#                   $offset{$type}{$strand}{'y'} - gdLargeFont->height, 
+#                   $strand,
+#                   $color{'black'});
+#    
+#    # close chromosome/sequence group
+#    $$ref_img->endGroup;
+#    printv("===> Finish Drawing pixels.");
+#}
+#
+############################################################################
 sub drawPixels{
     
     # Draw each pixel of strand
     # Input :
-    #   - $ref_img      ->  ref of the image
-    #   - $ref_rand     ->  ref on the hash of random numbers
-    #   - $ref_colour_scale  ->  colour_scale to use for colors
-    #   - $chr_size     ->  Chromosome/Sequence size
-    #   - $scaleFactor  ->  Scale_factor
-    #   - $type         ->  current to draw (label)
-    #   - $strand       ->  current strand in process (label)
-    #   - $strandColor  ->  color to use with strand
-    #   - $ref_gff      ->  ref of the current strand gff
+    #   - $ref_img			->	ref of the image
+    #   - $ref_rand			->	ref on the hash of random numbers
+    #   - $ref_colour_scale	->	colour_scale to use for colors
+	#   - $seqName			->	
+    #   - $chr_size			->	Chromosome/Sequence size
+    #   - $scaleFactor		->	Scale_factor
+    #   - $type				->	current to draw (label)
+    #   - $strand			->	current strand in process (label)
+    #   - $strandColor		->	color to use with strand
+    #   - $ref_gff			->	ref of the current strand gff
+	#   - 
+	#   - 
+	#   - 
     # Output: none
     
     printv("===> Start Drawing pixels ...");
 	printd("drawPixels: ");
     
-    my ($ref_img, $ref_rand, $cs, $seqName,
-		$chr_size, $scaleFactor, $type, $strand, $strandColor,
+    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,
+		$scaleFactor, $type, $strand, $strandColor,
 		$ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
+	my %covBases;
     my $randNum;
     my %intervals;
     my @previousBases = (0);
@@ -841,105 +1055,42 @@ sub drawPixels{
         	                   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + ($chr_size/$scale_factor),
         	                   $color{"${cs}_heatmap0"});
 	
-    # For each pixel of the chromosome/sequence
-    my $posPic = 0;
-    for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
-        
-    	next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
-		$posPic++;
-        
-		# Get number of base covered by the previous on pixel crosssing interval
-        my $basesCoverred = shift @previousBases;
-        $basesCoverred = 0 if (!defined $basesCoverred); # if @previousBases is empty
-        
-        printd("drawPixels: pos = $pos");
-        printd("drawPixels: basesCoverred Tab = -".join(" ", @previousBases)."-");
-        printd("drawPixels: basesCoverred = $basesCoverred (previous shift)");
-        printd("drawPixels: Start while");
-        printd("drawPixels: \$gff[0]->[0] = $gff[0]->[0]") if defined($gff[0]->[0]);
-		printd("drawPixels: \$pos * \$scaleFactor = ".($pos * $scaleFactor));
-        #printError( "\$gff[0]->[0] undef ! \n") if(!defined($gff[0]->[0]));
-        
-        # while the end of gff is not reached and the next start is in the current pixel
-        while (defined($gff[0]->[0]) and $gff[0]->[0] < ($pos * $scaleFactor)) {
-            my $ref_interval = shift(@gff);
-            
-            last if (!defined $ref_interval->[0]); # = defined($gff[0]->[0]) avoid warnings
-            
-            # get clearly start and end 
-            $intervals{'start_reel'}  = $ref_interval->[0];
-            $intervals{'end_reel'}    = $ref_interval->[1];
-
-            printd("drawPixels: \tstart_reel = $intervals{'start_reel'}");
-            printd("drawPixels: \tend_reel   = $intervals{'end_reel'}");
-            printd("drawPixels: \tcheck position");
-            
-            # feature end is on current pixel
-            if ($intervals{'end_reel'} < ($pos * $scaleFactor) ){ 
-                printd("drawPixels: \tCase 1 : \$basesCoverred += $intervals{'end_reel'} - $intervals{'start_reel'}");
-                printd("drawPixels: \tCase 1 : \$basesCoverred += ".($intervals{'end_reel'} - $intervals{'start_reel'}));
-                $basesCoverred += $intervals{'end_reel'} - $intervals{'start_reel'}; # increment the base counting
-            }
-            
-            # feature end is on next pixels
-            else{
-                # determine on how much pixel the interval is crossing
-                my $numPixelImpliy = floor(($intervals{'end_reel'} - $intervals{'start_reel'} - (($pos * $scaleFactor) - $intervals{'start_reel'}))/$scaleFactor);
-                
-                # Treating current position
-                $basesCoverred += ($pos * $scaleFactor) - $intervals{'start_reel'}; 
-                printd("drawPixels: \tCase 2 : \$basesCoverred += ($pos * $scaleFactor) - $intervals{'start_reel'}");
-                
-                # Treating the next full pixels 
-                for (my $i = 0 ; $i < $numPixelImpliy ; $i++){
-                    printd("drawPixels: \tCase 2 : \$previousBases[$i] += $scaleFactor");
-                    $previousBases[$i] += $scaleFactor;
-                }
-                
-                # Treat the last not full pixel
-                $previousBases[$numPixelImpliy] += (($intervals{'end_reel'} - $intervals{'start_reel'} - (($pos * $scaleFactor) - $intervals{'start_reel'}))%$scaleFactor);
-                printd("drawPixels: \tCase 2 : \$previousBases[$numPixelImpliy] += (($intervals{'end_reel'} - $intervals{'start_reel'} - (($pos * $scaleFactor) - $intervals{'start_reel'}))%$scaleFactor);");
-                
-            }# feature end is on next pixels
-            
-            printd("drawPixels: \tbasesCoverred = $basesCoverred");
-            
-        }# while ($intervalsTabM[0]->[0] < ($pos * $scaleFactor))
-        
-        printd("drawPixels: Stop while");
-        
-        # Compute percentage of base coverage
-        my $percentage;
-        if    ($ro eq "floor") {$percentage = floor(($basesCoverred/$scaleFactor) * 100);}
-        elsif ($ro eq "ceil" ) {$percentage = ceil (($basesCoverred/$scaleFactor) * 100);}
-        
-        printd("drawPixels: percentage = $basesCoverred/$scaleFactor = ".($basesCoverred/$scaleFactor));
-        printd("drawPixels: percentage = $percentage % \n");
-        print "$pos = ${cs}_heatmap$percentage\n" if $config{insaneDebugMode};
-        
-        # kill if more than 100 % 
-        if    ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
-		elsif ($percentage < 0)   {printError("Lesser than 0 % ($percentage % )", 1);}
+	printv("Size gff: ".scalar(@gff));
+	
+	while (my $refInterval = shift @gff){
+		my @interval = @$refInterval;
+		my $startInteger = int($interval[0]/$scale_factor);
+		my $startRemain  = int($interval[0]%$scale_factor);
+		my $endInteger   = int($interval[1]/$scale_factor);
+		my $endRemain    = int($interval[1]%$scale_factor);
 		
-		if ($percentage != 0){
-			# Draw the current pixel
-			if ($config{region_file}) {
-				$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $posPic * $win_size,
-										   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $posPic * $win_size + $win_size,
-										   $color{"${cs}_heatmap$percentage"});
-			}
-			else {
-				$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
-										   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
-										   $color{"${cs}_heatmap$percentage"});
-			}
+		if ($startInteger == $endInteger) {
+			$covBases{$endInteger} += $endRemain - $startRemain;
 		}
+		else {
+			$covBases{$startInteger} += $scale_factor - $startRemain;
+			for (my $i = ($startInteger+1) ; $i < $endInteger ; $i++){
+				$covBases{$i} += $scaleFactor;
+			}
+			$covBases{$endInteger} += $endRemain;
+		}
+	}
+	
+	for my $pos (sortedKeys(\%covBases)){
+		my $percentage;
+        if    ($ro eq "floor") {$percentage = floor(($covBases{$pos}/$scaleFactor) * 100);}
+        elsif ($ro eq "ceil" ) {$percentage = ceil (($covBases{$pos}/$scaleFactor) * 100);}
+		
+		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
+								   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
+									$color{"${cs}_heatmap$percentage"});
 		
 		my $st = $pos * $scaleFactor;
 		my $en = $pos * $scaleFactor + $scaleFactor;
 		print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
-	
-    }# End # For each pixel of the chromosome/sequence
+		
+	}	
+	# End # For each pixel of the chromosome/sequence
     
     # Draw Centromere
     if (defined($centro{start})) {
@@ -962,11 +1113,11 @@ sub drawPixels{
     $$ref_img->startGroup("rotate_$randNum");
     
     # Draw label Sequence Name
-    $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-                   $offset{$type}{$strand}{'y'} - (3 * gdLargeFont->height), 
-                   $seqName,
-                   $color{'black'});
+    #$$ref_img->string(gdLargeFont,
+    #               $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+    #               $offset{$type}{$strand}{'y'} - (3 * gdLargeFont->height), 
+    #               $seqName,
+    #               $color{'black'});
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
