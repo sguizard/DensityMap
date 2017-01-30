@@ -1,11 +1,11 @@
 # DensityMap
 
-It can usefull to visualize the presence and the density of genomics feature along chromosomes.
+It can be usefull to visualize the presence and the density of genomics feature along chromosomes.
 
 DensityMap is perl tool that automatically compute the percentage of feature covered bases on genomic window along chromosomes (or any sequences).
 
-It produce a map of density for each sequences and foreach feature.
-The output SVG can be custumized by setting margins, densityMaps widths, etc ...
+It produce a map of density for each sequences and for each feature.
+The output SVG can be customized by setting margins, densityMaps widths, etc ...
 
 If a fasta file of the plotted sequence is given as input, the script can also plot a densityMap the percentage of GC by window.
 
@@ -14,7 +14,7 @@ DensityMap rely only on two Perl modules:
 * PerlIO::gzip
 * GD::SVG
 
-The modules dcan be installed throught linux package manager:
+The modules can be installed throught linux package manager:
 ```
 # On debian based systeme (ubuntu, Linux mint, ...)
 sudo apt-get install libgd-svg-perl libperlio-gzip-perl
@@ -136,7 +136,7 @@ Command explaination:
 
 This command will produce this image: 
 
-![The obtained image: ](https://github.com/sguizard/DensityMap/blob/dev/dmel/dmel_1.svg)
+![The obtained image](https://github.com/sguizard/DensityMap/blob/dev/dmel/dmel_1.svg)
 
 It's possible to plot a densityMap of GC% by adding the option -gc {color_scale number} and to put the dasta sequence as input by using the -fasta option:
 
@@ -144,8 +144,10 @@ It's possible to plot a densityMap of GC% by adding the option -gc {color_scale 
 DensityMap.pl -i dmel.gff3 -re dmel.bed -fa dmel.fa -o dmel.svg -ty "type=LINE&strand=fused&lab=LINE" -ty "key=Target&val=Gypsy&strand=fused&cs=10&ro=ceil&lab=GYPSY" -ba white -sc 20000 -sh 100 -title "LTR and LINE retrotransposon in Dmel genome" -gc 12 -for
 ```
 
-![The obtained image: ](https://github.com/sguizard/DensityMap/blob/dev/dmel/dmel_2.svg)
+![The obtained image](https://github.com/sguizard/DensityMap/blob/dev/dmel/dmel_2.svg)
 
+TO WRITE: Region Ploting
+TO WRITE: Color scale customization
 
 
 ## Detailed options
@@ -257,6 +259,7 @@ DensityMap.pl -i dmel.gff3 -re dmel.bed -fa dmel.fa -o dmel.svg -ty "type=LINE&s
  * Default = 16
 
 
+## EXTERNAL LINKS
 DensityMap can be used online with a graphical interface : [DensityMap GUI](http://chicken-repeats.inra.fr/launchDM_form.php)
 
 DensityMap as been used to show the satellite (DNA repeats) in chicken genome: [Study using DensityMap](http://chicken-repeats.inra.fr)
