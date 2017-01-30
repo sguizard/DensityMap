@@ -106,7 +106,7 @@ my $space_chr             = ($config{space_chr})             ? $config{space_chr
    $margin{b}             = ($config{bmargin})               ? $config{bmargin}               : 50;
 my $label_strand_rotation = ($config{label_strand_rotation}) ? $config{label_strand_rotation} : 0;
 my $colour_scale          = ($config{colour_scale})          ? $config{colour_scale}          : 7;
-my $gc_cs                 = ($config{gc})                    ? $config{gc}                    : 7;
+my $gc_cs                 = ($config{gc})                    ? $config{gc}                    : 12;
 my $win_size              = ($config{win_size})              ? $config{win_size}              : 1;
 my $rounding_method       = ($config{rounding_method})       ? $config{rounding_method}       : "floor";
 my $fts                   = ($config{ft_size})               ? $config{ft_size}               : 16;
@@ -1137,8 +1137,8 @@ Options:
 											           - floor
 													   - ceil
 													   
-                                               Format: \"type=match&str=all type=gene&str=both type=CDS&str=fused\" or
-                                                       \"key=ID&val=transposon&str=all&cs=7&ro=ceil type=gene&str=both&cs=7\"
+                                               Format: -ty \"type=match&str=all\" -ty \"type=gene&str=both\" -ty \"type=CDS&str=fused\" or
+                                                       -ty \"key=ID&val=transposon&str=all&cs=7&ro=ceil\" -ty \"type=gene&str=both&cs=7\"
 
 Generic options: 
     -for   | force                 [booleen]   Automaticaly answer yes to picture size validation
