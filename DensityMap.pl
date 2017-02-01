@@ -72,12 +72,8 @@ $order{'fused'} = "-+";
 $order{'all'}   = "-;-+;+";
 my %rand;
 my %offset;
-$offset{'x'}  = 0;
-$offset{'y'}  = 0;
-$offset{'x1'} = 0;
-$offset{'y1'} = 0;
-$offset{'x2'} = 0;
-$offset{'y2'} = 0;
+$offset{'x'} = 0;
+$offset{'y'} = 0;
 my %listChr;
 
 $| = 1;
@@ -290,6 +286,10 @@ if (!$config{force}) {
         elsif ($response eq "y") {last;}
     }
 }
+
+# Setting offset
+$offset{x} = $margin{'l'};
+$offset{y} = $margin{'t'};
 
 # 2 Create picture
 printv("Create Picture ...");
@@ -523,87 +523,6 @@ sub processData{
         @plus      = removeIntervalRedundancy(@plus);
         @minusPlus = removeIntervalRedundancy(@minusPlus);
 		
-	    # 7.4 Set Offset
-        if ($gffTypes{$type}{'strand'} eq "-")     {
-            $offset{$type}{'-'}{'x'} = $margin{'l'}
-			                      + ($count * $strand_width)
-								  + ($count * $strand_space)
-								  - ($countGff * $strand_space)
-								  + ($countGff * $space_chr);
-            $offset{$type}{'-'}{'y'} = $margin{'t'};
-            $count++;
-            
-            printd("processData: x = $offset{$type}{'-'}{'x'}\ny = $offset{$type}{'-'}{'y'}");
-        }
-        elsif ($gffTypes{$type}{'strand'} eq "+")     {
-            $offset{$type}{'+'}{'x'} = $margin{'l'}
-			                      + ($count * $strand_width)
-								  + ($count * $strand_space)
-								  - ($countGff * $strand_space)
-								  + ($countGff * $space_chr);
-            $offset{$type}{'+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            printd("processData: + = $offset{$type}{'+'}{'x'}\n+ = $offset{$type}{'+'}{'y'}");
-        }
-        elsif ($gffTypes{$type}{'strand'} eq "both")  {
-            $offset{$type}{'-'}{'x'} = $margin{'l'}
-			                      + ($count * $strand_width)
-								  + ($count * $strand_space)
-								  - ($countGff * $strand_space)
-								  + ($countGff * $space_chr);
-            $offset{$type}{'-'}{'y'} = $margin{'t'};
-            $count++;
-            
-            $offset{$type}{'+'}{'x'} = $margin{'l'}
-			                      + ($count * $strand_width)
-								  + ($count * $strand_space)
-								  - ($countGff * $strand_space)
-								  + ($countGff * $space_chr);
-            $offset{$type}{'+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            printd("processData: + = $offset{$type}{'-'}{'x'}\n+ = $offset{$type}{'-'}{'y'}\n- = $offset{$type}{'+'}{'x'}\n- = $offset{$type}{'+'}{'y'}");
-        }
-        elsif ($gffTypes{$type}{'strand'} eq "fused") {
-            $offset{$type}{'-+'}{'x'} = $margin{'l'}
-								   + ($count * $strand_width)
-								   + ($count * $strand_space)
-								   - ($countGff * $strand_space)
-								   + ($countGff * $space_chr);
-            $offset{$type}{'-+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            printd("processData: f = $offset{$type}{'-+'}{'x'}\nf = $offset{$type}{'-+'}{'y'}");
-        }
-        elsif ($gffTypes{$type}{'strand'} eq "all")   {
-            $offset{$type}{'-'}{'x'} = $margin{'l'}
-								  + ($count * $strand_width)
-								  + ($count * $strand_space)
-								  - ($countGff * $strand_space)
-								  + ($countGff * $space_chr);
-            $offset{$type}{'-'}{'y'} = $margin{'t'};
-            $count++;
-            
-            $offset{$type}{'-+'}{'x'} = $margin{'l'}
-								   + ($count * $strand_width)
-								   + ($count * $strand_space)
-								   - ($countGff * $strand_space)
-								   + ($countGff * $space_chr);
-            $offset{$type}{'-+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            $offset{$type}{'+'}{'x'} = $margin{'l'}
-								  + ($count * $strand_width)
-								  + ($count * $strand_space)
-								  - ($countGff * $strand_space)
-								  + ($countGff * $space_chr);
-            $offset{$type}{'+'}{'y'} = $margin{'t'};
-            $count++;
-            
-            printd("processData: - = $offset{$type}{'-'}{'x'}\n- = $offset{$type}{'-'}{'y'}\nf = $offset{$type}{'-+'}{'x'}\nf = $offset{$type}{'-+'}{'y'}\n+ = $offset{$type}{'+'}{'x'}\n+ = $offset{$type}{'+'}{'y'}");
-        }
-		
 		printd("processData: typeToDraw = $type");
     
         foreach my $strand (split(";", $order{$gffTypes{$type}{'strand'}})){
@@ -620,21 +539,23 @@ sub processData{
 			
             drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor,
 					   $type, $strand, $strand, \%centromere, $ref_tab, $win_size, $ro, $la);
+			
+			$offset{x} += $strand_width;
+			$offset{x} += $strand_space;
         }
     }
     
     if ($config{gc}){
-        $offset{'gc'}{'x'} = $margin{'l'}
-		                   + ($count * $strand_width)
-						   + ($count * $strand_space)
-						   - ($countGff * $strand_space)
-						   + ($countGff * $space_chr);
-        $offset{'gc'}{'y'} = $margin{'t'};
-        $count++;
-		
+		printv("==> Processing GC% ...");
 		printError("Fasta sequence is not in the gff file ! ", 1) if (!$region{$chr}{seq});
+		
         drawPixelsGC(\$image, \%rand, $gc_cs, $chr, $region{$chr}{length}, $scale_factor, $win_size, \$region{$chr}{seq});
+		
+		$offset{x} += $strand_width;
+		$offset{x} += $strand_space;
     }
+	
+	$offset{x} += $space_chr - $strand_space;
 }
 
 ###########################################################################
@@ -829,9 +750,8 @@ sub drawPixels{
     printd("===> Start Drawing pixels ...");
 	printd("drawPixels: ");
     
-    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,
-		$scaleFactor, $type, $strand, $strandColor,
-		$ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
+    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,$scaleFactor, $type,
+		$strand, $strandColor, $ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
     my @gff    = @{$ref_gff};
     my %centro = %{$ref_centromere};
 	my %covBases;
@@ -859,15 +779,15 @@ sub drawPixels{
     
     # Draw label Sequence Name
     #$$ref_img->string(gdLargeFont,
-    #               $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-    #               $offset{$type}{$strand}{'y'} - (3 * gdLargeFont->height), 
+    #               $offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+    #               $offset{y} - (3 * gdLargeFont->height), 
     #               $seqName,
     #               $color{'black'});
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($la) * gdLargeFont->width)/2), 
-                   $offset{$type}{$strand}{'y'} - (2 * gdLargeFont->height), 
+                   $offset{x} + (($strand_width/2) - (length($la) * gdLargeFont->width)/2), 
+                   $offset{y} - (2 * gdLargeFont->height), 
                    $la,
                    $color{'black'});
     # Close label group for next rotation
@@ -875,14 +795,14 @@ sub drawPixels{
     
     # Draw strand label
     $$ref_img->string(gdLargeFont,
-                   $offset{$type}{$strand}{'x'} + (($strand_width/2) - (length($strand) * gdLargeFont->width)/2), 
-                   $offset{$type}{$strand}{'y'} - gdLargeFont->height, 
+                   $offset{x} + (($strand_width/2) - (length($strand) * gdLargeFont->width)/2), 
+                   $offset{y} - gdLargeFont->height, 
                    $strand,
                    $color{'black'});
     
 	# Draw Chromosome background
-	$$ref_img->filledRectangle($offset{$type}{$strand}{'x'}                , $offset{$type}{$strand}{'y'} + ($region{$seqName}{start}/$scale_factor),
-        	                   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + ($region{$seqName}{end}  /$scale_factor),
+	$$ref_img->filledRectangle($offset{x}                , $offset{y} + ($region{$seqName}{start}/$scale_factor),
+        	                   $offset{x} + $strand_width, $offset{y} + ($region{$seqName}{end}  /$scale_factor),
         	                   $color{"${cs}_heatmap0"});
 	
 	
@@ -912,8 +832,8 @@ sub drawPixels{
         if    ($ro eq "floor") {$percentage = floor(($covBases{$pos}/$scaleFactor) * 100);}
         elsif ($ro eq "ceil" ) {$percentage = ceil (($covBases{$pos}/$scaleFactor) * 100);}
 		
-		$$ref_img->filledRectangle($offset{$type}{$strand}{'x'},                 $offset{$type}{$strand}{'y'} + $pos * $win_size,
-								   $offset{$type}{$strand}{'x'} + $strand_width, $offset{$type}{$strand}{'y'} + $pos * $win_size + $win_size,
+		$$ref_img->filledRectangle($offset{x},                 $offset{y} + $pos * $win_size,
+								   $offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
 									$color{"${cs}_heatmap$percentage"});
 		
 		my $st = $pos * $scaleFactor;
@@ -927,16 +847,16 @@ sub drawPixels{
     if (defined($centro{start})) {
         #Left Triangle
         my $poly = new GD::Polygon;
-        $poly->addPt($offset{$type}{$strand}{'x'} - 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{start}/$scaleFactor));
-        $poly->addPt($offset{$type}{$strand}{'x'} - 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{end}  /$scaleFactor));
-        $poly->addPt(($offset{$type}{$strand}{'x'} + $strand_width/2), ($offset{$type}{$strand}{'y'} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+        $poly->addPt($offset{x} - 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
+        $poly->addPt($offset{x} - 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
+        $poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
         $$ref_img->filledPolygon($poly, $color{$config{'background'}});
         
         #Right Triangle
         $poly = new GD::Polygon;
-        $poly->addPt($offset{$type}{$strand}{'x'} + $strand_width + 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{start}/$scaleFactor));
-        $poly->addPt($offset{$type}{$strand}{'x'} + $strand_width + 1, ($offset{$type}{$strand}{'y'} + $$ref_centromere{end}  /$scaleFactor));
-        $poly->addPt(($offset{$type}{$strand}{'x'} + $strand_width/2), ($offset{$type}{$strand}{'y'} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+        $poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
+        $poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
+        $poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
         $$ref_img->filledPolygon($poly, $color{$config{'background'}});
     }
     
@@ -960,7 +880,7 @@ sub drawPixelsGC{
     #	- $ref_sequence	->	sequence of the chromosome
     # Ouput : none
     
-    print "Start Drawing pixels GC ...\n" if $config{'verbose'};
+    printd("Start Drawing pixels GC ...");
     
     my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $win_size, $ref_sequence) = @_;
     my $randNum;
@@ -972,8 +892,8 @@ sub drawPixelsGC{
         last;
     }
     
-    print "\tchr_size    = $chr_size\n"       if $config{'debug'};
-    print "\tscaleFactor = $scaleFactor\n"    if $config{'debug'};
+    printd("\tchr_size    = $chr_size");
+    printd("\tscaleFactor = $scaleFactor");
     
     # Open chromosome/sequence group
     $$ref_img->startGroup("+-_${randNum}");
@@ -1000,21 +920,21 @@ sub drawPixelsGC{
         
         # Draw the current pixel
 	if ($config{region_file}) {
-        $$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $posPic * $win_size,
-                	               $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $posPic * $win_size + $win_size,
+        $$ref_img->filledRectangle($offset{x},                 $offset{y} + $posPic * $win_size,
+                	               $offset{x} + $strand_width, $offset{y} + $posPic * $win_size + $win_size,
                 	               $color{"${cs}_heatmap$percentage"});
 	}
 	else {
-		$$ref_img->filledRectangle($offset{gc}{'x'},                 $offset{gc}{'y'} + $pos * $win_size,
-                                   $offset{gc}{'x'} + $strand_width, $offset{gc}{'y'} + $pos * $win_size + $win_size,
+		$$ref_img->filledRectangle($offset{x},                 $offset{y} + $pos * $win_size,
+                                   $offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
                                    $color{"${cs}_heatmap$percentage"});
 	}
-
-        my $st = $pos * $scaleFactor;
-        my $en = $pos * $scaleFactor + $scaleFactor;
-
-        print CSV "$seqName\tGC%\t$st\t$en\t$percentage\n";
-
+	
+    my $st = $pos * $scaleFactor;
+    my $en = $pos * $scaleFactor + $scaleFactor;
+	
+    print CSV "$seqName\tGC%\t$st\t$en\t$percentage\n";
+	
     }# End # For each pixel of the chromosome/sequence
     
     # Open label group for next rotation 
@@ -1022,15 +942,15 @@ sub drawPixelsGC{
     
     # Draw label Sequence Name
     #$$ref_img->string(gdLargeFont,
-    #               $offset{gc}{'x'} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-    #               $offset{gc}{'y'} - (3 * gdLargeFont->height), 
+    #               $offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+    #               $offset{y} - (3 * gdLargeFont->height), 
     #               $seqName,
     #               $color{'black'});
     
     # Draw label type
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'} + (($strand_width/2) - (length("GC%") * gdLargeFont->width)/2), 
-                   $offset{gc}{'y'} - (2 * gdLargeFont->height), 
+                   $offset{x} + (($strand_width/2) - (length("GC%") * gdLargeFont->width)/2), 
+                   $offset{y} - (2 * gdLargeFont->height), 
                    "GC%",
                    $color{'black'});
     # Close label group for next rotation
@@ -1038,14 +958,14 @@ sub drawPixelsGC{
     
     # Draw strand label
     $$ref_img->string(gdLargeFont,
-                   $offset{gc}{'x'} + (($strand_width/2) - (length("-+") * gdLargeFont->width)/2),
-                   $offset{gc}{'y'} - gdLargeFont->height, 
+                   $offset{x} + (($strand_width/2) - (length("-+") * gdLargeFont->width)/2),
+                   $offset{y} - gdLargeFont->height, 
                    "-+",
                    $color{'black'});
     
     # close chromosome/sequence group
     $$ref_img->endGroup;
-    print "Finish Drawing pixels.\n" if $config{'verbose'};
+    printd("Finish Drawing pixels.");
 }
 
 ###########################################################################
