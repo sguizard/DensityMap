@@ -4,8 +4,6 @@ use strict;
 use diagnostics;
 use warnings;
 use Getopt::Long;
-#use Term::ANSIColor;
-#use Data::Dumper;
 use PerlIO::gzip;
 use GD::SVG;
 use POSIX;
@@ -13,12 +11,6 @@ use Cwd 'abs_path';
 use File::Basename;
 
 #> Setting Parameters
-
-
-##> Define outputs colors
-#print STDOUT color 'blue';
-#print STDERR color 'red';
-
 
 ##> Define options
 my %config;
