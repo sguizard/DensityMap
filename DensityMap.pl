@@ -834,7 +834,7 @@ sub drawPixels{
 		
 		$$ref_img->filledRectangle($offset{x},                 $offset{y} + $pos * $win_size,
 								   $offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
-									$color{"${cs}_heatmap$percentage"});
+								   $color{"${cs}_heatmap$percentage"});
 		
 		my $st = $pos * $scaleFactor;
 		my $en = $pos * $scaleFactor + $scaleFactor;
