@@ -9,6 +9,7 @@ use GD::SVG;
 use POSIX;
 use Cwd 'abs_path';
 use File::Basename;
+use List::MoreUtils qw{ minmax };
 
 #> Setting Parameters
 
@@ -18,35 +19,35 @@ my @gffFiles;
 my @typeArray;
 my @fastaFiles;
 GetOptions (\%config,
-            'input=s' => \@gffFiles,
-            'region_file=s',
-			'fasta=s' => \@fastaFiles,
-            'type_to_draw=s' => \@typeArray,
-            'output_img_name=s',
-            'rounding_method=s',
-            'show_scale=i',
-            'str_width=i',
-            'str_space=i',
-            'space_chr=i',
-            'scale_factor=i',
-            'auto_scale_factor=i',
-            'background=s',
-            'transparency=s', 
-            'lmargin=i',
-            'rmargin=i',
-            'tmargin=i',
-            'bmargin=i',
-            'label_strand_rotation=i',
-            'title=s',
-            'force',
-            'win_size=i',
-            'colour_scale=i',
-            'gc=i',
-            'ft_family=s',
-            'ft_size=i',
-			'verbose',
-            'debug',
-			'help');
+	'input=s' => \@gffFiles,
+	'region_file=s',
+	'fasta=s' => \@fastaFiles,
+	'type_to_draw=s' => \@typeArray,
+	'output_img_name=s',
+	'rounding_method=s',
+	'show_scale=i',
+	'str_width=i',
+	'str_space=i',
+	'space_chr=i',
+	'scale_factor=i',
+	'auto_scale_factor=i',
+	'background=s',
+	'transparency=s', 
+	'lmargin=i',
+	'rmargin=i',
+	'tmargin=i',
+	'bmargin=i',
+	'label_strand_rotation=i',
+	'title=s',
+	'force',
+	'win_size=i',
+	'colour_scale=i',
+	'gc=i',
+	'ft_family=s',
+	'ft_size=i',
+	'verbose',
+	'debug',
+	'help');
 
 
 ##> Print USAGE if --help
@@ -58,7 +59,7 @@ if (!scalar(@gffFiles))               {printError ("\n!!!! input is MANDATORY !!
 if (!exists $config{output_img_name}) {printError ("\n!!!! output_img_name is MANDATORY !!!!! \n\n\n", 0);       printUsage(1);}
 if (!exists $config{region_file})     {printError ("\n!!!! region_file is MANDATORY !!!!! \n\n\n", 0);           printUsage(1);}
 if (!scalar(@typeArray))              {printError ("\n!!!! type_to_draw options is  MANDATORY !!!!! \n\n\n", 0); printUsage(1);}
-#if (! -e $config{input})                  {printError ("gff $config{input} not exist ! \n"); printUsage(1);}
+#if (! -e $config{input})             {printError ("gff $config{input} not exist ! \n"); printUsage(1);}
 
 ##> Setting Global Variables
 my %color;
@@ -165,7 +166,7 @@ my $numOfGff          = scalar(@chrOrder);
 my $maxSequenceLength = 0;
 
 foreach my $k (keys %region){
-    $maxSequenceLength = ($region{$k}{length} > $maxSequenceLength) ? $region{$k}{length} : $maxSequenceLength;
+	$maxSequenceLength = ($region{$k}{length} > $maxSequenceLength) ? $region{$k}{length} : $maxSequenceLength;
 }
 
 
@@ -173,19 +174,20 @@ if ($title) {$margin{'t'} += 40};
 
 
 if ($config{auto_scale_factor}) {
-    while (1) {
-        $picHeight = $margin{'t'}
-                   + $margin{'b'}
-                   + (floor(($maxSequenceLength/$scale_factor)*$win_size));
-        last if ($picHeight < $config{auto_scale_factor});
-        $scale_factor *= 10;
-    }
-    print "Selected Scale Factor = $scale_factor\n";
+	while (1) {
+		$picHeight = 
+			$margin{'t'}
+			+ $margin{'b'}
+			+ (floor(($maxSequenceLength/$scale_factor)*$win_size));
+		last if ($picHeight < $config{auto_scale_factor});
+		$scale_factor *= 10;
+	}
+	print "Selected Scale Factor = $scale_factor\n";
 }
 else{
-    $picHeight = $margin{'t'}
-               + $margin{'b'}
-               + (floor(($maxSequenceLength/$scale_factor)*$win_size));
+	$picHeight = $margin{'t'}
+		+ $margin{'b'}
+		+ (floor(($maxSequenceLength/$scale_factor)*$win_size));
 }
 
 
@@ -202,17 +204,27 @@ foreach my $type_group (@typeArray){
 	my $strandOption = "";
 	my $csOption     = "";
 	my $roOption     = "";
+	my $countOption  = "";
 	
 	foreach my $option (split(/&/, $type_group)){
-		$option =~ /([^=]+)=([^=]+)/;
+		my $key;
+		my $val;
 		
-		my $key = lc($1);
-		my $val = $2;
+		if ($option =~ /([^=]+)=([^=]+)/){
+			$key = lc($1);
+			$val = $2;
+		}
+		elsif ($option =~ /([^=]+)/){
+			$key = lc($1);
+			$val = 1;
+		}
 		
-		if    ($key eq "type")  {$typeOption = $val;}
-		elsif ($key eq "key")   {$keyOption  = $val;}
-		elsif ($key eq "val")   {$valOption  = $val;}
-		elsif ($key eq "lab")   {$labOption  = $val;}
+		
+		if    ($key eq "type")  {$typeOption  = $val;}
+		elsif ($key eq "key")   {$keyOption   = $val;}
+		elsif ($key eq "val")   {$valOption   = $val;}
+		elsif ($key eq "lab")   {$labOption   = $val;}
+		elsif ($key eq "count") {$countOption = $val;}
 		elsif ($key eq "strand"){
 			if ($val ne "+" && $val ne "-" && $val ne "both" &&
 				$val ne "fused"            && $val ne "all"){
@@ -232,7 +244,7 @@ foreach my $type_group (@typeArray){
 			}
 			$roOption = $val;
 		}
-		else  {printError("Type option : INVALID KEY, $val, check help please.\n", 1)}
+		else  {printError("Type option : INVALID KEY, $key, check help please.\n", 1)}
 	}
 	
 	if (!($typeOption ^ ($keyOption && $valOption))){
@@ -247,9 +259,10 @@ foreach my $type_group (@typeArray){
 	$type_valid{$type}++;
 	
 	$gffTypes{$type}{strand}   = $strandOption;
-	$gffTypes{$type}{colour}   = ($csOption)  ? $csOption  : $colour_scale;
-	$gffTypes{$type}{rounding} = ($roOption)  ? $roOption  : $rounding_method;
-	$gffTypes{$type}{label}    = ($labOption) ? $labOption : $type;
+	$gffTypes{$type}{colour}   = ($csOption)    ? $csOption    : $colour_scale;
+	$gffTypes{$type}{rounding} = ($roOption)    ? $roOption    : $rounding_method;
+	$gffTypes{$type}{label}    = ($labOption)   ? $labOption   : $type;
+	$gffTypes{$type}{count}    = ($countOption) ? $countOption : 0;
 	
 	if ($strandOption eq "-" or $strandOption eq "+" or $strandOption eq "fused"){
 		$gffTypes{$type}{Nstrand} = 1;
@@ -267,24 +280,24 @@ foreach my $type_group (@typeArray){
 
 $margin{'l'} = $margin{'l'} + $scaleAddWidth if ($config{show_scale});
 $picWidth = $margin{'l'}
-          + $margin{'r'}
-          + (($numOfGff * $numOfStrand      ) * $strand_width)
-          + (($numOfGff * ($numOfStrand - 1)) * $strand_space)
-          + (($numOfGff - 1) * $space_chr);
+	+ $margin{'r'}
+	+ (($numOfGff * $numOfStrand      ) * $strand_width)
+	+ (($numOfGff * ($numOfStrand - 1)) * $strand_space)
+	+ (($numOfGff - 1) * $space_chr);
 
 if ($config{gc}){
 	$picWidth += ($numOfGff * $strand_width) 
-			  +  ($numOfGff * $strand_space);
+		+  ($numOfGff * $strand_space);
 }
 
 ## 1.3 Ask if image size is OK
 if (!$config{force}) {
-    while (1) {
-        print "Is the picture size will be ok ? ($picWidth px x $picHeight px) [y/n] : ";
-        chomp (my $response = <STDIN>);
-        if    ($response eq "n") {exit;}
-        elsif ($response eq "y") {last;}
-    }
+	while (1) {
+		print "Is the picture size will be ok ? ($picWidth px x $picHeight px) [y/n] : ";
+		chomp (my $response = <STDIN>);
+		if    ($response eq "n") {exit;}
+		elsif ($response eq "y") {last;}
+	}
 }
 
 # Setting offset
@@ -298,45 +311,72 @@ my $image = GD::SVG::Image->new($picWidth, $picHeight);
 
 # 3 Loading colors from colours.txt
 printv("Load colors ...");
-open(COLOR, "<".dirname(abs_path($0))."/colours.txt") or die "Can not open colours.txt";
+open(COLOR, "<".dirname(abs_path($0))."/colors/generic_colors.txt") or die "Can not open ".dirname(abs_path($0))."/colors/generic_colors.txt";
 while (<COLOR>) {
-    next if /^#/;
-    /([\d\w]+);(\d+);(\d+);(\d+)/;
-    $color{lc($1)} = $image->colorAllocate($2,$3,$4);
+	next if /^#/;
+	/([\d\w]+);(\d+);(\d+);(\d+)/;
+	$color{lc($1)} = $image->colorAllocate($2,$3,$4);
 }
 close COLOR;
 
+open(COLOR, "<".dirname(abs_path($0))."/colors/heatmap_colors.txt") or die "Can not open ".dirname(abs_path($0))."/heatmap_colors.txt";
+while (<COLOR>) {
+	next if /^#/;
+	/([\d\w]+);(\d+);(\d+);(\d+)/;
+	$color{lc($1)} = $image->colorAllocate($2,$3,$4);
+}
+close COLOR;
+
+open(COLOR, "<".dirname(abs_path($0))."/colors/count_colors2.txt") or die "Can not open ".dirname(abs_path($0))."/count_colors.txt";
+while (<COLOR>) {
+	next if /^#/;
+	chomp;
+	
+	my @tmp      = split ";";
+	my $count_id = shift @tmp;
+	
+	for (@tmp){
+		/(\d+),(\d+),(\d+)/;
+		$color{$count_id} = [] if (!exists($color{$count_id}));
+		push @{$color{$count_id}}, $image->colorAllocate($1,$2,$3);
+	}
+}
+close COLOR;
+
+
 # 4 Draw Background
 if ($config{'background'}) {
-    printv("Draw background ...");
-    $image->filledRectangle(0, 0, $picWidth, $picHeight, $color{$config{'background'}});
+	printv("Draw background ...");
+	$image->filledRectangle(0, 0, $picWidth, $picHeight, $color{$config{'background'}});
 }
 
 
 # 5 Drawing Title and Scale
 if ($config{title}){
 	printv("Drawing title ...");
-    if ($config{show_scale}) {
-        $image->string( gdLargeFont,
-                        $scaleAddWidth + ($picWidth - $scaleAddWidth) / 2 - ((gdLargeFont->width * length $config{title})/2), 
-                        20 - ((gdLargeFont->height) / 2),
-                        $config{title},
-                        $color{'black'});
+	if ($config{show_scale}) {
+		$image->string(
+			gdLargeFont,
+			$scaleAddWidth + ($picWidth - $scaleAddWidth) / 2 - ((gdLargeFont->width * length $config{title})/2), 
+			20 - ((gdLargeFont->height) / 2),
+			$config{title},
+			$color{'black'});
     }
     else {
-        $image->string( gdLargeFont,
-                        $picWidth / 2 - ((gdLargeFont->width * length $config{title})/2), 
-                        20 - ((gdLargeFont->height) / 2),
-                        $config{title},
-                        $color{'black'});
+		$image->string(
+			gdLargeFont,
+			$picWidth / 2 - ((gdLargeFont->width * length $config{title})/2), 
+			20 - ((gdLargeFont->height) / 2),
+			$config{title},
+			$color{'black'});
     }
 }
 
 if ($config{show_scale}) {
-    printv("Drawing Scale ...");
-    my $scale_size = floor($maxSequenceLength/$scale_factor);
-    printd("Scale_size : $scale_size");
-    drawScale(\$image, $scale_size, $maxSequenceLength, $scaleAddWidth, $scale_factor, $numMaxTicks, $margin{'t'}, $win_size);
+	printv("Drawing Scale ...");
+	my $scale_size = floor($maxSequenceLength/$scale_factor);
+	printd("Scale_size : $scale_size");
+	drawScale(\$image, $scale_size, $maxSequenceLength, $scaleAddWidth, $scale_factor, $numMaxTicks, $margin{'t'}, $win_size);
 }
 
 
@@ -448,22 +488,23 @@ foreach my $chr (@chrOrder) {
 	processData($chr);
 	$nbChr++;
 	$countGff++;
-
+	
 	my $nbType = ($config{gc}) ? (scalar(@type_array)+1) : scalar(@type_array);
 	my $strandGroupWidth = $nbType * $strand_width + ($nbType-1) * $strand_space;
 	
 	my $x = $margin{l} +
-		   ($nbChr - 1) * $strandGroupWidth +
-		   ($nbChr - 1) * $space_chr + 
-		   ($strandGroupWidth)/2;
-
+		($nbChr - 1) * $strandGroupWidth +
+		($nbChr - 1) * $space_chr + 
+		($strandGroupWidth)/2;
+	
 	my $y = $margin{'t'};
-
-	$image->string(gdLargeFont,
-				   $x - (length($chr) * gdLargeFont->width/2),
-				   $y - (3 * gdLargeFont->height),
-				   $chr,
-				   $color{'black'});
+	
+	$image->string(
+		gdLargeFont,
+		$x - (length($chr) * gdLargeFont->width/2),
+		$y - (3 * gdLargeFont->height),
+		$chr,
+		$color{'black'});
 }
 
 close CSV;
@@ -474,23 +515,23 @@ open(IMG, ">$config{output_img_name}") or die "Can not open $config{output_img_n
 binmode IMG;
 my @text = split("\t", $image->svg);
 #if (!$config{transparency}) {
-    my $switchRotate = 0;
-    foreach (@text){
-        if    ($config{label_strand_rotation} and /<g id="rotate_\d+">/)     {$switchRotate++;}
-        elsif ($config{label_strand_rotation} and /<\/g>/ and $switchRotate) {$switchRotate--;}
-        
-        if ($switchRotate) {s/x="([\d\.]+)" y="([\d\.]+)"/x="$1" y="$2" transform="rotate($label_strand_rotation, $1, $2)"/;}
+	my $switchRotate = 0;
+	foreach (@text){
+		if    ($config{label_strand_rotation} and /<g id="rotate_\d+">/)     {$switchRotate++;}
+		elsif ($config{label_strand_rotation} and /<\/g>/ and $switchRotate) {$switchRotate--;}
 		
-        if ($config{ft_family}) {s/font="Helvetica"/font-family="$config{ft_family}"/;}
-        if ($fts != 16)         {s/font-size="16"/font-size="$fts"/;}
-        s/stroke-opacity: 1.0;?//g;
-        s/stroke-width: 1;?//g;
-        s/stroke: rgb\(\d+,\d+,\d+\);?//g;
-        s/ +/ /g;
-        s/style=" /style="/g;
-        s/;? " width/" width/g;
-        print IMG $_;
-    }    
+		if ($switchRotate) {s/x="([\d\.]+)" y="([\d\.]+)"/x="$1" y="$2" transform="rotate($label_strand_rotation, $1, $2)"/;}
+		
+		if ($config{ft_family}) {s/font="Helvetica"/font-family="$config{ft_family}"/;}
+		if ($fts != 16)         {s/font-size="16"/font-size="$fts"/;}
+		s/stroke-opacity: 1.0;?//g;
+		s/stroke-width: 1;?//g;
+		s/stroke: rgb\(\d+,\d+,\d+\);?//g;
+		s/ +/ /g;
+		s/style=" /style="/g;
+		s/;? " width/" width/g;
+		print IMG $_;
+	}
 #}
 
 
@@ -516,19 +557,19 @@ sub processData{
 		@minusPlus =                       @{$gffData{$chr}{$type}};
 		
 		@minus     = sort {$a->[1] <=> $b->[1]} @minus;
-        @plus      = sort {$a->[1] <=> $b->[1]} @plus;
-        @minusPlus = sort {$a->[1] <=> $b->[1]} @minusPlus;
+		@plus      = sort {$a->[1] <=> $b->[1]} @plus;
+		@minusPlus = sort {$a->[1] <=> $b->[1]} @minusPlus;
 		
 		@minus     = removeIntervalRedundancy(@minus);
-        @plus      = removeIntervalRedundancy(@plus);
-        @minusPlus = removeIntervalRedundancy(@minusPlus);
+		@plus      = removeIntervalRedundancy(@plus);
+		@minusPlus = removeIntervalRedundancy(@minusPlus);
 		
 		printd("processData: typeToDraw = $type");
-    
-        foreach my $strand (split(";", $order{$gffTypes{$type}{'strand'}})){
-            printd("processData: strand = $strand");
-            
-            my $cs = $gffTypes{$type}{colour};
+		
+		foreach my $strand (split(";", $order{$gffTypes{$type}{'strand'}})){
+			printd("processData: strand = $strand");
+			
+			my $cs = $gffTypes{$type}{colour};
 			my $ro = $gffTypes{$type}{rounding};
 			my $la = $gffTypes{$type}{label};
 			my $ref_tab;
@@ -537,549 +578,616 @@ sub processData{
 			elsif ($strand eq "+") {$ref_tab =\@plus;}
 			elsif ($strand eq "-+"){$ref_tab =\@minusPlus;}
 			
-            drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor,
+			drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor,
 					   $type, $strand, $strand, \%centromere, $ref_tab, $win_size, $ro, $la);
 			
 			$offset{x} += $strand_width;
 			$offset{x} += $strand_space;
-        }
-    }
-    
+		}
+	}
+	
     if ($config{gc}){
 		printv("==> Processing GC% ...");
 		printError("Fasta sequence is not in the gff file ! ", 1) if (!$region{$chr}{seq});
 		
-        drawPixelsGC(\$image, \%rand, $gc_cs, $chr, $region{$chr}{length}, $scale_factor, $win_size, \$region{$chr}{seq});
+		drawPixelsGC(\$image, \%rand, $gc_cs, $chr, $region{$chr}{length}, $scale_factor, $win_size, \$region{$chr}{seq});
 		
 		$offset{x} += $strand_width;
 		$offset{x} += $strand_space;
-    }
+	}
 	
 	$offset{x} += $space_chr - $strand_space;
 }
 
 ###########################################################################
 sub removeIntervalRedundancy{
-    
-    # The purpose of this function is to remove or merging the feature of the gff
-    # Input  : sorted array of start - end array
-    # Output : sorted array of start - end array without crossing intervals
-    
-    #my ($ref_intervalsFused, @gff) = @_;
-    my (@gff) = @_;
-    my @reduced_gff;
-    my $bool_firstInterval = 1;
-    
+	
+	# The purpose of this function is to remove or merging the feature of the gff
+	# Input  : sorted array of start - end array
+	# Output : sorted array of start - end array without crossing intervals
+	
+	#my ($ref_intervalsFused, @gff) = @_;
+	my (@gff) = @_;
+	my @reduced_gff;
+	my $bool_firstInterval = 1;
+	
 	printd("removeIntervalRedundancy: ");
 	
-    printd("removeIntervalRedundancy: Start removeIntervalRedundancy ...");
-    printd("removeIntervalRedundancy: \tStarting gff size = ".@gff);
-    
-    
-    foreach my $annot (@gff) {
-        
-        # The intervals of the gff have been sorted by 'start' before using this function
-        # so only three case are possebles :
-        #   #1 Previous and current intervals crossing
-        #   #2 Current interval included in previous interval
-        #   #3 Current interval not inclued in previous interval
-        
-        #######################################################
-        ################### Possibles Cases ###################
-        ####################################################### x + <- Current start/end interval
-        #          Start                         End          # <-<-<- Previous interval
-        #######################################################
-        #1           |            x               ]     +     # Intervales chevauchants
-        #2           |            x         +     ]           # Intervales inclu dans le précédent
-        #3           |                            |   x    +  # Intervales non-chevauchants
-        #######################################################
-        
-        print "\t---> Current interval = $annot->[1], $annot->[2]\n"            if $config{insaneDebugMode};
-        
-        #Load first interval
-        if ($bool_firstInterval) {
-            print "\nLoad first interval\n"                                     if $config{'insaneDebugMode'};
-            
-            push(@reduced_gff, [$annot->[1], $annot->[2]]);
-            $bool_firstInterval--;
-            
-            print "\tannot = $annot\n"                                          if $config{insaneDebugMode};
-            print "\t\$annot->[1], \$annot->[2] = $annot->[1], $annot->[2]\n"   if $config{insaneDebugMode}; 
-            print "\t\@reduced_gff size = ".@reduced_gff."\n\n"                 if $config{insaneDebugMode};
-            
-            next;
-        }
-        
-        if ($annot->[1] <= $reduced_gff[$#reduced_gff]->[1] and     #1
-            $annot->[2] >  $reduced_gff[$#reduced_gff]->[1]) {
-            # Replace previous end
-            $reduced_gff[$#reduced_gff]->[1] = $annot->[2];
-        }
-        elsif ($annot->[1] <= $reduced_gff[$#reduced_gff]->[1] and  #2
-               $annot->[2] <=  $reduced_gff[$#reduced_gff]->[1]) {
-            # Go to next interval
-            next;
-        }
-        else {                                                      #3
-            # Insert interval in reduced gff
-            push(@reduced_gff, [$annot->[1], $annot->[2]]);
-        }
-    } #End foreach (@gff)
-    
-    printd("removeIntervalRedundancy: \tFinal gff size    = ".@reduced_gff);
-    printd("removeIntervalRedundancy: Finished\n");
-
-    return @reduced_gff;
+	printd("removeIntervalRedundancy: Start removeIntervalRedundancy ...");
+	printd("removeIntervalRedundancy: \tStarting gff size = ".@gff);
+	
+	
+	foreach my $annot (@gff) {
+		
+		# The intervals of the gff have been sorted by 'start' before using this function
+		# so only three case are possebles :
+		#   #1 Previous and current intervals crossing
+		#   #2 Current interval included in previous interval
+		#   #3 Current interval not inclued in previous interval
+		
+		#######################################################
+		################### Possibles Cases ###################
+		####################################################### x + <- Current start/end interval
+		#          Start                         End          # <-<-<- Previous interval
+		#######################################################
+		#1           |            x               ]     +     # Intervales chevauchants
+		#2           |            x         +     ]           # Intervales inclu dans le précédent
+		#3           |                            |   x    +  # Intervales non-chevauchants
+		#######################################################
+		
+		print "\t---> Current interval = $annot->[1], $annot->[2]\n"            if $config{insaneDebugMode};
+		
+		#Load first interval
+		if ($bool_firstInterval) {
+			print "\nLoad first interval\n"                                     if $config{'insaneDebugMode'};
+			
+			push(@reduced_gff, [$annot->[1], $annot->[2]]);
+			$bool_firstInterval--;
+			
+			print "\tannot = $annot\n"                                          if $config{insaneDebugMode};
+			print "\t\$annot->[1], \$annot->[2] = $annot->[1], $annot->[2]\n"   if $config{insaneDebugMode}; 
+			print "\t\@reduced_gff size = ".@reduced_gff."\n\n"                 if $config{insaneDebugMode};
+			
+			next;
+		}
+		
+		if ($annot->[1] <= $reduced_gff[$#reduced_gff]->[1] and     #1
+			$annot->[2] >  $reduced_gff[$#reduced_gff]->[1]) {
+			# Replace previous end
+			$reduced_gff[$#reduced_gff]->[1] = $annot->[2];
+		}
+		elsif ($annot->[1] <= $reduced_gff[$#reduced_gff]->[1] and  #2
+			   $annot->[2] <=  $reduced_gff[$#reduced_gff]->[1]) {
+			# Go to next interval
+			next;
+		}
+		else {                                                      #3
+			# Insert interval in reduced gff
+			push(@reduced_gff, [$annot->[1], $annot->[2]]);
+		}
+	} #End foreach (@gff)
+	
+	printd("removeIntervalRedundancy: \tFinal gff size    = ".@reduced_gff);
+	printd("removeIntervalRedundancy: Finished\n");
+	
+	return @reduced_gff;
 }
 
 ############################################################################
 sub drawScale{
-    
-    # Drawing the scale on the left side of graph
-    # Input :
-    #   - $ref_img          -> reference of the image
-    #   - $chr_size         -> chromosome/sequence size divided by scale_factor
-    #   - $chr_size_reel    -> chromosome/sequence size
-    #   - $widthScale       -> Width of the scale
-    #   - $basesPerPixel    -> Number of bases per pixels (scale_factor)
-    #   - $maxTicks         -> Number Max of ticks
-    #   - $marginTop        -> size of top margin
-    # Output : none
-    
-    my ($ref_img, $chr_size, $chr_size_reel, $widthScale, $basesPerPixel, $maxTicks, $marginTop, $win_size) = @_;
-    my $basesPerTicks = 10;
-
-    # Search the number of tick to use
-    printd("drawScale: Start searching num ticks");
-    while (1) {
-        $numTicks = floor($chr_size/$basesPerTicks);
-        printd("basesPerTicks = $basesPerTicks \t numTicks = $numTicks");
-        last if ($numTicks <= $maxTicks);
-        $basesPerTicks*=10; 
-    }
-    printd("drawScale: Found num ticks");
-    
-    # Define the 10^x bases to use as unit
-    my $power = floor(log10($basesPerTicks*$basesPerPixel));
-    
-    # Add label unit
-    my $string = "(x10e$power bases)";
-    $$ref_img->string(gdSmallFont,
-                   $widthScale - 15 - (gdSmallFont->width * length $string),
-                   $marginTop - 5,
-                   $string,
-                   $color{'black'});
-    
-    #Add ratio pixel base label (2 lines)
-    $string = "(1 win = ";
-    $$ref_img->string(gdSmallFont,
-                   $widthScale - 15 - (gdSmallFont->width * length "$basesPerPixel bases)"),
-                   $marginTop - 5 + gdSmallFont->height,
-                   $string,
-                   $color{'black'});
-    
-    $string = "$basesPerPixel bases)";
-    $$ref_img->string(gdSmallFont,
-                   $widthScale - 15 - (gdSmallFont->width * length $string),
-                   $marginTop - 5 + (gdSmallFont->height * 2),
-                   $string,
-                   $color{'black'});
-    
-    # Draw scale
-    printd("drawScale: \$\$ref_img->filledRectangle($widthScale - 10, $marginTop, $widthScale - 8, $marginTop + $chr_size, \$color{'black'})\;");
-    $$ref_img->filledRectangle($widthScale - 10,
-                            $marginTop,
-                            $widthScale - 8,
-                            $marginTop + $chr_size * $win_size,
-                            $color{'black'});
-    
-    # Draw scale last tick
-    $string = sprintf("%.2f", $chr_size_reel/(10**$power));
-    $$ref_img->string(gdLargeFont,
-                   #$widthScale - 15 - (gdLargeFont->width * length $string),
-                   $widthScale - 15,
-                   #$marginTop + $chr_size - 8,
-                   $marginTop + $chr_size * $win_size,
-                   $string,
-                   $color{'black'});
-    printd("drawScale: \$\$ref_img->filledRectangle($widthScale - 10, $marginTop + $chr_size - 1, $widthScale, $marginTop + $chr_size, \$color{'black'})\;");
-    $$ref_img->filledRectangle($widthScale - 10,
-                            $marginTop + $chr_size * $win_size - 1,
-                            $widthScale,
-                            $marginTop + $chr_size * $win_size,
-                            $color{'black'});
-    
-    #Draw scale other ticks
-    for (my $currentTick = 0 ; $currentTick <= $numTicks ; $currentTick++) {
-        $string = sprintf("%.2f", ((($basesPerTicks * $currentTick) * $basesPerPixel) /10**$power));
-        $string = 0 if ($currentTick == 0);
-        $$ref_img->string(gdLargeFont,
-                       $widthScale - 15 -(gdLargeFont->width * length $string),
-                       $marginTop + ($basesPerTicks * $currentTick) * $win_size - 8,
-                       $string,
-                       $color{'black'});
-         
-        printd("drawScale: \$\$ref_img->filledRectangle($widthScale - 10, $marginTop + ($basesPerTicks * $currentTick), $widthScale, $marginTop + ($basesPerTicks * $currentTick) + 1, \$color{'black'})\;");
-        $$ref_img->filledRectangle($widthScale - 10,
-                                $marginTop + ($basesPerTicks * $currentTick) * $win_size,
-                                $widthScale,
-                                $marginTop + ($basesPerTicks * $currentTick) * $win_size + 1,
-                                $color{'black'});
-    }
+	
+	# Drawing the scale on the left side of graph
+	# Input :
+	#   - $ref_img          -> reference of the image
+	#   - $chr_size         -> chromosome/sequence size divided by scale_factor
+	#   - $chr_size_reel    -> chromosome/sequence size
+	#   - $widthScale       -> Width of the scale
+	#   - $basesPerPixel    -> Number of bases per pixels (scale_factor)
+	#   - $maxTicks         -> Number Max of ticks
+	#   - $marginTop        -> size of top margin
+	# Output : none
+	
+	my ($ref_img, $chr_size, $chr_size_reel, $widthScale, $basesPerPixel, $maxTicks, $marginTop, $win_size) = @_;
+	my $basesPerTicks = 10;
+	
+	# Search the number of tick to use
+	printd("drawScale: Start searching num ticks");
+	while (1) {
+		$numTicks = floor($chr_size/$basesPerTicks);
+		printd("basesPerTicks = $basesPerTicks \t numTicks = $numTicks");
+		last if ($numTicks <= $maxTicks);
+		$basesPerTicks*=10; 
+	}
+	printd("drawScale: Found num ticks");
+	
+	# Define the 10^x bases to use as unit
+	my $power = floor(log10($basesPerTicks*$basesPerPixel));
+	
+	# Add label unit
+	my $string = "(x10e$power bases)";
+	$$ref_img->string(
+		gdSmallFont,
+		$widthScale - 15 - (gdSmallFont->width * length $string),
+		$marginTop - 5,
+		$string,
+		$color{'black'});
+	
+	#Add ratio pixel base label (2 lines)
+	$string = "(1 win = ";
+	$$ref_img->string(
+		gdSmallFont,
+		$widthScale - 15 - (gdSmallFont->width * length "$basesPerPixel bases)"),
+		$marginTop - 5 + gdSmallFont->height,
+		$string,
+		$color{'black'});
+	
+	$string = "$basesPerPixel bases)";
+	$$ref_img->string(
+		gdSmallFont,
+		$widthScale - 15 - (gdSmallFont->width * length $string),
+		$marginTop - 5 + (gdSmallFont->height * 2),
+		$string,
+		$color{'black'});
+	
+	# Draw scale
+	printd("drawScale: \$\$ref_img->filledRectangle($widthScale - 10, $marginTop, $widthScale - 8, $marginTop + $chr_size, \$color{'black'})\;");
+	$$ref_img->filledRectangle(
+		$widthScale - 10,
+		$marginTop,
+		$widthScale - 8,
+		$marginTop + $chr_size * $win_size,
+		$color{'black'});
+	
+	# Draw scale last tick
+	$string = sprintf("%.2f", $chr_size_reel/(10**$power));
+	$$ref_img->string(
+		gdLargeFont,
+		#$widthScale - 15 - (gdLargeFont->width * length $string),
+		$widthScale - 15,
+		#$marginTop + $chr_size - 8,
+		$marginTop + $chr_size * $win_size,
+		$string,
+		$color{'black'});
+	printd("drawScale: \$\$ref_img->filledRectangle($widthScale - 10, $marginTop + $chr_size - 1, $widthScale, $marginTop + $chr_size, \$color{'black'})\;");
+	$$ref_img->filledRectangle(
+		$widthScale - 10,
+		$marginTop + $chr_size * $win_size - 1,
+		$widthScale,
+		$marginTop + $chr_size * $win_size,
+		$color{'black'});
+	
+	#Draw scale other ticks
+	for (my $currentTick = 0 ; $currentTick <= $numTicks ; $currentTick++) {
+		$string = sprintf("%.2f", ((($basesPerTicks * $currentTick) * $basesPerPixel) /10**$power));
+		$string = 0 if ($currentTick == 0);
+		$$ref_img->string(
+			gdLargeFont,
+			$widthScale - 15 -(gdLargeFont->width * length $string),
+			$marginTop + ($basesPerTicks * $currentTick) * $win_size - 8,
+			$string,
+			$color{'black'});
+		
+		printd("drawScale: \$\$ref_img->filledRectangle($widthScale - 10, $marginTop + ($basesPerTicks * $currentTick), $widthScale, $marginTop + ($basesPerTicks * $currentTick) + 1, \$color{'black'})\;");
+		$$ref_img->filledRectangle(
+			$widthScale - 10,
+			$marginTop + ($basesPerTicks * $currentTick) * $win_size,
+			$widthScale,
+			$marginTop + ($basesPerTicks * $currentTick) * $win_size + 1,
+			$color{'black'});
+	}
 	printd("drawScale: ");
 }
 
 ############################################################################
 sub drawPixels{
-    
-    # Draw each pixel of strand
-    # Input :
-    #   - $ref_img			->	ref of the image
-    #   - $ref_rand			->	ref on the hash of random numbers
-    #   - $ref_colour_scale	->	colour_scale to use for colors
+	
+	# Draw each pixel of strand
+	# Input :
+	#   - $ref_img			->	ref of the image
+	#   - $ref_rand			->	ref on the hash of random numbers
+	#   - $ref_colour_scale	->	colour_scale to use for colors
 	#   - $seqName			->	
-    #   - $chr_size			->	Chromosome/Sequence size
-    #   - $scaleFactor		->	Scale_factor
-    #   - $type				->	current to draw (label)
-    #   - $strand			->	current strand in process (label)
-    #   - $strandColor		->	color to use with strand
-    #   - $ref_gff			->	ref of the current strand gff
+	#   - $chr_size			->	Chromosome/Sequence size
+	#   - $scaleFactor		->	Scale_factor
+	#   - $type				->	current to draw (label)
+	#   - $strand			->	current strand in process (label)
+	#   - $strandColor		->	color to use with strand
+	#   - $ref_gff			->	ref of the current strand gff
 	#
-    # Output: none
-    
-    printd("===> Start Drawing pixels ...");
+	# Output: none
+	
+	printd("===> Start Drawing pixels ...");
 	printd("drawPixels: ");
-    
-    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,$scaleFactor, $type,
+	
+	my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,$scaleFactor, $type,
 		$strand, $strandColor, $ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
-    my @gff    = @{$ref_gff};
-    my %centro = %{$ref_centromere};
+	my @gff    = @{$ref_gff};
+	my %centro = %{$ref_centromere};
 	my %covBases;
-    my $randNum;
-    my %intervals;
-    my @previousBases = (0);
-    
-    # Search a unique random number
-    while (1) {
-        $randNum = int rand(1000);
-        redo if $$ref_rand{$randNum}++;
-        last;
-    }
-    
-    printd("drawPixels: chr_size    = $chr_size");
-    printd("drawPixels: scaleFactor = $scaleFactor");
-    printd("drawPixels: type        = $type");
-    printd("drawPixels: strand      = $strand\n");
-    
-    # Open chromosome/sequence group
-    $$ref_img->startGroup("${strand}_${randNum}");
+	my $randNum;
+	my %intervals;
+	my @previousBases = (0);
+	
+	# Search a unique random number
+	while (1) {
+		$randNum = int rand(1000);
+		redo if $$ref_rand{$randNum}++;
+		last;
+	}
+	
+	printd("drawPixels: chr_size    = $chr_size");
+	printd("drawPixels: scaleFactor = $scaleFactor");
+	printd("drawPixels: type        = $type");
+	printd("drawPixels: strand      = $strand\n");
+	
+	# Open chromosome/sequence group
+	$$ref_img->startGroup("${strand}_${randNum}");
 	
 	# Open label group for next rotation 
-    $$ref_img->startGroup("rotate_$randNum");
-    
-    # Draw label Sequence Name
-    #$$ref_img->string(gdLargeFont,
-    #               $offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-    #               $offset{y} - (3 * gdLargeFont->height), 
-    #               $seqName,
-    #               $color{'black'});
-    
-    # Draw label type
-    $$ref_img->string(gdLargeFont,
-                   $offset{x} + (($strand_width/2) - (length($la) * gdLargeFont->width)/2), 
-                   $offset{y} - (2 * gdLargeFont->height), 
-                   $la,
-                   $color{'black'});
-    # Close label group for next rotation
-    $$ref_img->endGroup;
-    
-    # Draw strand label
-    $$ref_img->string(gdLargeFont,
-                   $offset{x} + (($strand_width/2) - (length($strand) * gdLargeFont->width)/2), 
-                   $offset{y} - gdLargeFont->height, 
-                   $strand,
-                   $color{'black'});
-    
-	# Draw Chromosome background
-	$$ref_img->filledRectangle($offset{x}                , $offset{y} + ($region{$seqName}{start}/$scale_factor),
-        	                   $offset{x} + $strand_width, $offset{y} + ($region{$seqName}{end}  /$scale_factor),
-        	                   $color{"${cs}_heatmap0"});
+	$$ref_img->startGroup("rotate_$randNum");
 	
+	# Draw label Sequence Name
+	#$$ref_img->string(
+	#	gdLargeFont,
+	#	$offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+	#	$offset{y} - (3 * gdLargeFont->height), 
+	#	$seqName,
+	#	$color{'black'});
+	
+	# Draw label type
+	$$ref_img->string(
+		gdLargeFont,
+		$offset{x} + (($strand_width/2) - (length($la) * gdLargeFont->width)/2), 
+		$offset{y} - (2 * gdLargeFont->height), 
+		$la,
+		$color{'black'});
+	# Close label group for next rotation
+	$$ref_img->endGroup;
+	
+	# Draw strand label
+	$$ref_img->string(
+		gdLargeFont,
+		$offset{x} + (($strand_width/2) - (length($strand) * gdLargeFont->width)/2), 
+		$offset{y} - gdLargeFont->height, 
+		$strand,
+		$color{'black'});
 	
 	
 	# Drawing chromosomes windows
-	while (my $refInterval = shift @gff){
-		my @interval = @$refInterval;
-		my $startInteger = int($interval[0]/$scale_factor);
-		my $startRemain  = int($interval[0]%$scale_factor);
-		my $endInteger   = int($interval[1]/$scale_factor);
-		my $endRemain    = int($interval[1]%$scale_factor);
+	if ($gffTypes{$type}{count}){
+		# Draw Chromosome background
+		$$ref_img->filledRectangle(
+		$offset{x}                , $offset{y} + ($region{$seqName}{start}/$scale_factor),
+		$offset{x} + $strand_width, $offset{y} + ($region{$seqName}{end}  /$scale_factor),
+		$color{"count_${cs}"}->[0]);
 		
-		if ($startInteger == $endInteger) {
-			$covBases{$endInteger} += $endRemain - $startRemain;
+		printd("drawPixels: Counting ...");
+		while (my $refInterval = shift @gff){
+			my @interval = @$refInterval;
+			
+			my $startInteger = int($interval[0]/$scale_factor);
+			$covBases{$startInteger}++;
 		}
+		printd("drawPixels: Finish Counting ...");
+		
+		my @minMax = minmax values %covBases;
+		my $colour_scale_factor;
+		
+		printd("Searching color scale factor");
+		if    ($minMax[1]   < 9){$colour_scale_factor = 1;}
+		elsif ($minMax[1]/2 < 9){$colour_scale_factor = 2;}
 		else {
-			$covBases{$startInteger} += $scale_factor - $startRemain;
-			for (my $i = ($startInteger+1) ; $i < $endInteger ; $i++){
-				$covBases{$i} += $scaleFactor;
+			$colour_scale_factor = 5;
+			while (1){
+				if ($minMax[1]/$colour_scale_factor < 9){last;}
+				$colour_scale_factor += 5;
 			}
-			$covBases{$endInteger} += $endRemain;
+		}
+		printd("Found color scale factor: $colour_scale_factor");
+		
+		for my $pos (sortedKeys(\%covBases)){
+			my $color = int($covBases{$pos}/$colour_scale_factor)+1;
+			
+			$$ref_img->filledRectangle(
+				$offset{x}                , $offset{y} + $pos * $win_size,
+				$offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
+				$color{"count_${cs}"}->[$color]);
+			
+			my $st = $pos * $scaleFactor;
+			my $en = $pos * $scaleFactor + $scaleFactor;
+			
+			print CSV "$seqName\t$type\t$st\t$en\t$covBases{$pos}\n";
 		}
 	}
-	
-	for my $pos (sortedKeys(\%covBases)){
-		my $percentage;
-        if    ($ro eq "floor") {$percentage = floor(($covBases{$pos}/$scaleFactor) * 100);}
-        elsif ($ro eq "ceil" ) {$percentage = ceil (($covBases{$pos}/$scaleFactor) * 100);}
+	else {
+		# Draw Chromosome background
+		$$ref_img->filledRectangle(
+			$offset{x}                , $offset{y} + ($region{$seqName}{start}/$scale_factor),
+			$offset{x} + $strand_width, $offset{y} + ($region{$seqName}{end}  /$scale_factor),
+			$color{"${cs}_heatmap0"});
 		
-		$$ref_img->filledRectangle($offset{x},                 $offset{y} + $pos * $win_size,
-								   $offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
-								   $color{"${cs}_heatmap$percentage"});
+		while (my $refInterval = shift @gff){
+			my @interval     = @$refInterval;
+			my $startInteger = int($interval[0]/$scale_factor);
+			my $startRemain  = int($interval[0]%$scale_factor);
+			my $endInteger   = int($interval[1]/$scale_factor);
+			my $endRemain    = int($interval[1]%$scale_factor);
+			
+			if ($startInteger == $endInteger) {
+				$covBases{$endInteger} += $endRemain - $startRemain;
+			}
+			else {
+				$covBases{$startInteger} += $scale_factor - $startRemain;
+				for (my $i = ($startInteger+1) ; $i < $endInteger ; $i++){
+					$covBases{$i} += $scaleFactor;
+				}
+				$covBases{$endInteger} += $endRemain;
+			}
+		}
 		
-		my $st = $pos * $scaleFactor;
-		my $en = $pos * $scaleFactor + $scaleFactor;
-		print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
-		
-	}	
+		for my $pos (sortedKeys(\%covBases)){
+			my $percentage;
+			if    ($ro eq "floor") {$percentage = floor(($covBases{$pos}/$scaleFactor) * 100);}
+			elsif ($ro eq "ceil" ) {$percentage = ceil (($covBases{$pos}/$scaleFactor) * 100);}
+			
+			$$ref_img->filledRectangle(
+				$offset{x},                 $offset{y} + $pos * $win_size,
+				$offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
+				$color{"${cs}_heatmap$percentage"});
+			
+			my $st = $pos * $scaleFactor;
+			my $en = $pos * $scaleFactor + $scaleFactor;
+			
+			print CSV "$seqName\t$type\t$st\t$en\t$percentage\n";
+			
+		}
+	}
 	# End # For each pixel of the chromosome/sequence
-    
-    # Draw Centromere
-    if (defined($centro{start})) {
-        #Left Triangle
-        my $poly = new GD::Polygon;
-        $poly->addPt($offset{x} - 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
-        $poly->addPt($offset{x} - 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
-        $poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
-        $$ref_img->filledPolygon($poly, $color{$config{'background'}});
-        
-        #Right Triangle
-        $poly = new GD::Polygon;
-        $poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
-        $poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
-        $poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
-        $$ref_img->filledPolygon($poly, $color{$config{'background'}});
-    }
-    
-    # close chromosome/sequence group
-    $$ref_img->endGroup;
-    printd("===> Finish Drawing pixels.");
+	
+	# Draw Centromere
+	if (defined($centro{start})) {
+		#Left Triangle
+		my $poly = new GD::Polygon;
+		$poly->addPt($offset{x} - 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
+		$poly->addPt($offset{x} - 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
+		$poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+		$$ref_img->filledPolygon($poly, $color{$config{'background'}});
+		
+		#Right Triangle
+		$poly = new GD::Polygon;
+		$poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
+		$poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
+		$poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+		$$ref_img->filledPolygon($poly, $color{$config{'background'}});
+	}
+	
+	# close chromosome/sequence group
+	$$ref_img->endGroup;
+	printd("===> Finish Drawing pixels.");
 }
 
 ###########################################################################
 sub drawPixelsGC{
-    
-    # Draw each pixel of strand
-    # Input :
-    #   - $ref_img      ->  ref of the image
-    #   - $ref_rand     ->  ref on the hash of random numbers
-    #   - $cs           ->  colour_scale to use for colors
-    #	- $seqName		->	Name of the annotated sequence
-    #   - $chr_size     ->  Chromosome/Sequence size
-    #   - $scaleFactor  ->  Scale_factor
-    #	- $win_size		->	Size of the printed window in pixel
-    #	- $ref_sequence	->	sequence of the chromosome
-    # Ouput : none
-    
-    printd("Start Drawing pixels GC ...");
-    
-    my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $win_size, $ref_sequence) = @_;
-    my $randNum;
-    
-    # Search a unique random number
-    while (1) {
-        $randNum = int rand(1000);
-        redo if $$ref_rand{$randNum}++;
-        last;
-    }
-    
-    printd("\tchr_size    = $chr_size");
-    printd("\tscaleFactor = $scaleFactor");
-    
-    # Open chromosome/sequence group
-    $$ref_img->startGroup("+-_${randNum}");
-    
-    # For each pixel of the chromosome/sequence
-    my $posPic = 0;
-    for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
+	
+	# Draw each pixel of strand
+	# Input :
+	#   - $ref_img      ->  ref of the image
+	#   - $ref_rand     ->  ref on the hash of random numbers
+	#   - $cs           ->  colour_scale to use for colors
+	#	- $seqName		->	Name of the annotated sequence
+	#   - $chr_size     ->  Chromosome/Sequence size
+	#   - $scaleFactor  ->  Scale_factor
+	#	- $win_size		->	Size of the printed window in pixel
+	#	- $ref_sequence	->	sequence of the chromosome
+	# Ouput : none
+	
+	printd("Start Drawing pixels GC ...");
+	
+	my ($ref_img, $ref_rand, $cs, $seqName, $chr_size, $scaleFactor, $win_size, $ref_sequence) = @_;
+	my $randNum;
+	
+	# Search a unique random number
+	while (1) {
+		$randNum = int rand(1000);
+		redo if $$ref_rand{$randNum}++;
+		last;
+	}
+	
+	printd("\tchr_size    = $chr_size");
+	printd("\tscaleFactor = $scaleFactor");
+	
+	# Open chromosome/sequence group
+	$$ref_img->startGroup("+-_${randNum}");
+	
+	# For each pixel of the chromosome/sequence
+	my $posPic = 0;
+	for (my $pos = 0 ; $pos <= $chr_size ; $pos++) {
 	#Get next window sequence
 	my $win_seq = substr $$ref_sequence, 0, $scaleFactor, '';
 	
 	next if ($config{region_file} && (($pos*$scaleFactor) < $region{$seqName}{start} || ($pos*$scaleFactor+$scaleFactor) > $region{$seqName}{end}));
 	$posPic++;
-
+	
 	#Count GC bases
 	my $gcBases = $win_seq =~ tr/GC//;
-
-        # Compute percentage of base coverage
-        my $percentage;
-        if    ($rounding_method eq "floor") {$percentage = floor(($gcBases/$scaleFactor) * 100);}
-        elsif ($rounding_method eq "ceil" ) {$percentage = ceil (($gcBases/$scaleFactor) * 100);}
-        
-        # kill if more than 100 % 
-        if ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
-        
-        # Draw the current pixel
+	
+	# Compute percentage of base coverage
+	my $percentage;
+	if    ($rounding_method eq "floor") {$percentage = floor(($gcBases/$scaleFactor) * 100);}
+	elsif ($rounding_method eq "ceil" ) {$percentage = ceil (($gcBases/$scaleFactor) * 100);}
+	
+	# kill if more than 100 % 
+	if ($percentage > 100) {printError("Higher than 100 % ($percentage % )", 1);}
+	
+	# Draw the current pixel
 	if ($config{region_file}) {
-        $$ref_img->filledRectangle($offset{x},                 $offset{y} + $posPic * $win_size,
-                	               $offset{x} + $strand_width, $offset{y} + $posPic * $win_size + $win_size,
-                	               $color{"${cs}_heatmap$percentage"});
+		$$ref_img->filledRectangle(
+			$offset{x},                 $offset{y} + $posPic * $win_size,
+			$offset{x} + $strand_width, $offset{y} + $posPic * $win_size + $win_size,
+			$color{"${cs}_heatmap$percentage"});
 	}
 	else {
-		$$ref_img->filledRectangle($offset{x},                 $offset{y} + $pos * $win_size,
-                                   $offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
-                                   $color{"${cs}_heatmap$percentage"});
+		$$ref_img->filledRectangle(
+			$offset{x},                 $offset{y} + $pos * $win_size,
+			$offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
+			$color{"${cs}_heatmap$percentage"});
 	}
 	
-    my $st = $pos * $scaleFactor;
-    my $en = $pos * $scaleFactor + $scaleFactor;
+	my $st = $pos * $scaleFactor;
+	my $en = $pos * $scaleFactor + $scaleFactor;
 	
-    print CSV "$seqName\tGC%\t$st\t$en\t$percentage\n";
+	print CSV "$seqName\tGC%\t$st\t$en\t$percentage\n";
 	
-    }# End # For each pixel of the chromosome/sequence
-    
-    # Open label group for next rotation 
-    $$ref_img->startGroup("rotate_$randNum");
-    
-    # Draw label Sequence Name
-    #$$ref_img->string(gdLargeFont,
-    #               $offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-    #               $offset{y} - (3 * gdLargeFont->height), 
-    #               $seqName,
-    #               $color{'black'});
-    
-    # Draw label type
-    $$ref_img->string(gdLargeFont,
-                   $offset{x} + (($strand_width/2) - (length("GC%") * gdLargeFont->width)/2), 
-                   $offset{y} - (2 * gdLargeFont->height), 
-                   "GC%",
-                   $color{'black'});
-    # Close label group for next rotation
-    $$ref_img->endGroup;
-    
-    # Draw strand label
-    $$ref_img->string(gdLargeFont,
-                   $offset{x} + (($strand_width/2) - (length("-+") * gdLargeFont->width)/2),
-                   $offset{y} - gdLargeFont->height, 
-                   "-+",
-                   $color{'black'});
-    
-    # close chromosome/sequence group
-    $$ref_img->endGroup;
-    printd("Finish Drawing pixels.");
+	}# End # For each pixel of the chromosome/sequence
+	
+	# Open label group for next rotation 
+	$$ref_img->startGroup("rotate_$randNum");
+	
+	# Draw label Sequence Name
+	#$$ref_img->string(
+	#	gdLargeFont,
+	#	$offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
+	#	$offset{y} - (3 * gdLargeFont->height), 
+	#	$seqName,
+	#	$color{'black'});
+	
+	# Draw label type
+	$$ref_img->string(
+		gdLargeFont,
+		$offset{x} + (($strand_width/2) - (length("GC%") * gdLargeFont->width)/2), 
+		$offset{y} - (2 * gdLargeFont->height), 
+		"GC%",
+		$color{'black'});
+	# Close label group for next rotation
+	$$ref_img->endGroup;
+	
+	# Draw strand label
+	$$ref_img->string(
+		gdLargeFont,
+		$offset{x} + (($strand_width/2) - (length("-+") * gdLargeFont->width)/2),
+		$offset{y} - gdLargeFont->height, 
+		"-+",
+		$color{'black'});
+	
+	# close chromosome/sequence group
+	$$ref_img->endGroup;
+	printd("Finish Drawing pixels.");
 }
 
 ###########################################################################
 sub openr{
-    my $file = shift;
+	my $file = shift;
 	my $fh;
 	
 	if ($file =~ /\.gz$/){open $fh, "<:gzip", $file or printError("ERROR : Cannot open $file ! \n", 1);}
-    else                 {open $fh, "<",      $file or printError("ERROR : Cannot open $file ! \n", 1);}
+	else                 {open $fh, "<",      $file or printError("ERROR : Cannot open $file ! \n", 1);}
 	
-    return $fh;
+	return $fh;
 }
 
 ###########################################################################
 sub openw{
-    my $file = shift;
-    
-    open my $fh, ">", $file or printError("ERROR : Cannot open $file ! \n", 1);
-    return $fh;
+	my $file = shift;
+	
+	open my $fh, ">", $file or printError("ERROR : Cannot open $file ! \n", 1);
+	return $fh;
 }
 
 ###########################################################################
 sub sortedKeys{
-    my $hashRef = shift;
-    
-    return sort {$a cmp $b} (keys %$hashRef);
+	my $hashRef = shift;
+	
+	return sort {$a cmp $b} (keys %$hashRef);
 }
 
 ###########################################################################
 sub printv{
-    my $str = shift;
-    
-    print "$str\n" if $v;
+	my $str = shift;
+	
+	print "$str\n" if $v;
 }
 
 ###########################################################################
 sub printd{
-    my $str = shift;
-    $str = " " if (!$str);
-    
-    print STDERR "DEBUG: $str\n" if $d;
+	my $str = shift;
+	$str = " " if (!$str);
+	
+	print STDERR "DEBUG: $str\n" if $d;
 }
 ###########################################################################
 sub printError{
-    my $string = shift;
-    my $exit = shift;
-    
-    print STDERR $string;
-    exit if $exit;
+	my $string = shift;
+	my $exit = shift;
+	
+	print STDERR $string;
+	exit if $exit;
 }
 
 ###########################################################################
 sub printUsage{
-    my $exit = shift;
-    
-    print STDOUT
+	my $exit = shift;
+	
+	print STDOUT
 "USAGE: DensityMap.pl -i chromosome1.gff3 -i chromosome2.gff3 -ty 'match=all' -o Chromosome
-    
-Options:
-    -i     | input                 [string]    Gff file                                (Mandatory)
-    -re    | region_file           [string]    A bed file describing the regions to plot 
-                                               for each sequence to plot. Allow to plot 
-                                               sepecific region and not whole sequence.
-                                               Exemple:
-                                               seq1\t100000\t200000
-                                               seq2\t200000\t350000
-    -o     | output_img_name       [string]    Name of the output image                (Mandatory)
-    -ty    | type_to_draw          [string]    List of type (column 3 of gff)          (Mandatory)
-                                               to draw, strand (str), color scale (cs), rounding_method (ro)
-                                               Type:
-											           - 3rd column -> type
-													   - 9th column -> key and val
-                                               Strand:
-												       - -     -> strand -
-                                                       - +     -> strand +
-                                                       - both  -> strand - and strand +
-                                                       - fused -> Combination of strand - and strand +
-                                                       - all   -> strand - and strand + and fused
-											   
-											   Rounding method:
-											           - floor
-													   - ceil
-													   
-                                               Format: -ty \"type=match&str=all\" -ty \"type=gene&str=both\" -ty \"type=CDS&str=fused\" or
-                                                       -ty \"key=ID&val=transposon&str=all&cs=7&ro=ceil\" -ty \"type=gene&str=both&cs=7\"
 
-Generic options: 
-    -for   | force                 [booleen]   Automaticaly answer yes to picture size validation
-    -v     | verbose               [booleen]   MORE text dude !!!!
-    -h     | help                  [booleen]   This help
+Options:
+    -i      | input                 [string]    Gff file                                (Mandatory)
+    -re     | region_file           [string]    A bed file describing the regions to plot
+                                                for each sequence to plot. Allow to plot
+                                                sepecific region and not whole sequence.
+                                                Exemple:
+                                                    seq1\t100000\t200000
+                                                    seq2\t200000\t350000
+    -o      | output_img_name       [string]    Name of the output image                (Mandatory)
+    -ty     | type_to_draw          [string]    List of type (column 3 of gff)          (Mandatory)
+                                                to draw, strand (str), color scale (cs), rounding_method (ro)
+                                                Type:
+                                                    - 3rd column -> type
+                                                    - 9th column -> key and val
+                                                
+                                                Strand:
+                                                    - -     -> strand -
+                                                    - +     -> strand +
+                                                    - both  -> strand - and strand +
+                                                    - fused -> Combination of strand - and strand +
+                                                    - all   -> strand - and strand + and fused
+                                                
+                                                Rounding method:
+                                                    - floor
+                                                    - ceil
+                                                
+                                                Format: 
+                                                    -ty \"type=match&str=all\" -ty \"type=gene&str=both\" -ty \"type=CDS&str=fused\" or
+                                                    -ty \"key=ID&val=transposon&str=all&cs=7&ro=ceil\" -ty \"type=gene&str=both&cs=7\"
+
+Generic options:
+    -for    | force                 [booleen]    Automaticaly answer yes to picture size validation
+    -v      | verbose               [booleen]    MORE text dude !!!!
+    -h      | help                  [booleen]    This help
 
 Density options: 
-    -c     | colour_scale          [integer]   Color scale to use    (Default = 7)
-    -sc    | scale_factor          [integer]   = window length in bp (Default = 1000)
-    -a     | auto_scale_factor     [integer]   Max picture height in pixel
-    -ro    | rounding_method       [string]    floor or ceil         (Default = floor)
-    -gc    | gc                    [integer]   if set, add a density map of the GC% (fasta option must be set)
+    -c      | colour_scale          [integer]    Color scale to use    (Default = 7)
+    -sc     | scale_factor          [integer]    = window length in bp (Default = 1000)
+    -a      | auto_scale_factor     [integer]    Max picture height in pixel
+    -ro     | rounding_method       [string      floor or ceil         (Default = floor)
+    -gc     | gc                    [integer]    if set, add a density map of the GC% (fasta option must be set)
 
-Graphical options: 
-    -ti    | title                 [string]    Title to print on the picture
-    -w     | win_size              [integer]   Height of window in pixel       (Default = 1)
-    -sh    | show_scale            [integer]   Draw scale, the integer indicate the maximum 
-                                               tick to print on the scale      (Default = 50)
-    -str_w | str_width             [integer]   Strand width in pixel           (Default = 50)
-    -str_s | str_space             [integer]   Space between strands in pixel  (Default = 30)
-    -sp    | space_chr             [integer]   Space between chromsomes        (Default = 50)
-    -lm    | lmargin               [integer]   Left margin in pixel            (Default = 50)
-    -rm    | rmargin               [integer]   Rigth margin in pixel           (Default = 50)
-    -tm    | tmargin               [integer]   Top margin in pixel             (Default = 50)
-    -bm    | bmargin               [integer]   Bottom margin in pixel          (Default = 50)
-    -ba    | background color      [string]    Fill Background                 (Default = no Background)
-    -la    | label_strand_rotation [integer]   Rotation degree of strand label (Default = 0)
-    -ft_f  | ft-family             [string]    Font to use for text            (Default = Helvetica)
-    -ft_s  | ft-size               [integer]   Size of the font                (Default = 16)
+Graphical options:
+    -ti     | title                 [string]    Title to print on the picture
+    -w      | win_size              [integer]   Height of window in pixel        (Default = 1)
+    -sh     | show_scale            [integer]   Draw scale, the integer indicate the maximum 
+                                                tick to print on the scale       (Default = 50)
+    -str_w  | str_width             [integer]   Strand width in pixel            (Default = 50)
+    -str_s  | str_space             [integer]   Space between strands in pixel   (Default = 30)
+    -sp     | space_chr             [integer]   Space between chromsomes         (Default = 50)
+    -lm     | lmargin               [integer]   Left margin in pixel             (Default = 50)
+    -rm     | rmargin               [integer]   Rigth margin in pixel            (Default = 50)
+    -tm     | tmargin               [integer]   Top margin in pixel              (Default = 50)
+    -bm     | bmargin               [integer]   Bottom margin in pixel           (Default = 50)
+    -ba     | background color      [string]    Fill Background                  (Default = no Background)
+    -la     | label_strand_rotation [integer]   Rotation degree of strand label  (Default = 0)
+    -ft_f   | ft-family             [string]    Font to use for text             (Default = Helvetica)
+    -ft_s   | ft-size               [integer]   Size of the font                 (Default = 16)
 
 
     This program is free software: you can redistribute it and/or modify
@@ -1100,5 +1208,5 @@ Graphical options:
 #    -i   | insaneDebugMode           So much prints !!!! 
 #    -tr | transparency n            Set transparency, integer between 0 and 1 included
 
-    exit if $exit;
+	exit if $exit;
 }
