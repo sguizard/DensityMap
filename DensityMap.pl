@@ -9,7 +9,7 @@ use GD::SVG;
 use POSIX;
 use Cwd 'abs_path';
 use File::Basename;
-use List::MoreUtils qw{ minmax };
+#use List::MoreUtils qw{ minmax };
 
 #> Setting Parameters
 
@@ -42,6 +42,7 @@ GetOptions (\%config,
 	'force',
 	'win_size=i',
 	'colour_scale=i',
+	'colour_scale_count=i',
 	'gc=i',
 	'ft_family=s',
 	'ft_size=i',
@@ -95,6 +96,7 @@ my $space_chr             = ($config{space_chr})             ? $config{space_chr
    $margin{b}             = ($config{bmargin})               ? $config{bmargin}               : 50;
 my $label_strand_rotation = ($config{label_strand_rotation}) ? $config{label_strand_rotation} : 0;
 my $colour_scale          = ($config{colour_scale})          ? $config{colour_scale}          : 7;
+my $colour_scale_count    = ($config{colour_scale_count})    ? $config{colour_scale_count}    : 1;
 my $gc_cs                 = ($config{gc})                    ? $config{gc}                    : 12;
 my $win_size              = ($config{win_size})              ? $config{win_size}              : 1;
 my $rounding_method       = ($config{rounding_method})       ? $config{rounding_method}       : "floor";
@@ -205,6 +207,8 @@ foreach my $type_group (@typeArray){
 	my $csOption     = "";
 	my $roOption     = "";
 	my $countOption  = "";
+	my $countSteps   = "";
+	my $ccsOption    = "";
 	
 	foreach my $option (split(/&/, $type_group)){
 		my $key;
@@ -220,11 +224,17 @@ foreach my $type_group (@typeArray){
 		}
 		
 		
-		if    ($key eq "type")  {$typeOption  = $val;}
-		elsif ($key eq "key")   {$keyOption   = $val;}
-		elsif ($key eq "val")   {$valOption   = $val;}
-		elsif ($key eq "lab")   {$labOption   = $val;}
-		elsif ($key eq "count") {$countOption = $val;}
+		if    ($key eq "type")       {$typeOption  = $val;}
+		elsif ($key eq "key")        {$keyOption   = $val;}
+		elsif ($key eq "val")        {$valOption   = $val;}
+		elsif ($key eq "lab")        {$labOption   = $val;}
+		elsif ($key eq "count")      {$countOption = $val;}
+		elsif ($key eq "countsteps") {
+			if ($val =~ /\D+/){
+				printError("Type option : INVALID countSteps VALUE, $val, check help please.\n", 1);
+			}
+			$countSteps  = $val;
+		}
 		elsif ($key eq "strand"){
 			if ($val ne "+" && $val ne "-" && $val ne "both" &&
 				$val ne "fused"            && $val ne "all"){
@@ -237,6 +247,12 @@ foreach my $type_group (@typeArray){
 				printError("Type option : INVALID CS VALUE, $val, check help please.\n", 1);
 			}
 			$csOption = $val;
+		}
+		elsif ($key eq "ccs"){
+			if ($val =~ /\D+/){
+				printError("Type option : INVALID CCS VALUE, $val, check help please.\n", 1);
+			}
+			$ccsOption = $val;
 		}
 		elsif ($key eq "ro"){
 			if ($val ne "floor" && $val ne "ceil"){
@@ -258,11 +274,13 @@ foreach my $type_group (@typeArray){
 	push @type_array, $type;
 	$type_valid{$type}++;
 	
-	$gffTypes{$type}{strand}   = $strandOption;
-	$gffTypes{$type}{colour}   = ($csOption)    ? $csOption    : $colour_scale;
-	$gffTypes{$type}{rounding} = ($roOption)    ? $roOption    : $rounding_method;
-	$gffTypes{$type}{label}    = ($labOption)   ? $labOption   : $type;
-	$gffTypes{$type}{count}    = ($countOption) ? $countOption : 0;
+	$gffTypes{$type}{strand}          = $strandOption;
+	$gffTypes{$type}{colour}          = ($csOption)    ? $csOption    : $colour_scale;
+	$gffTypes{$type}{rounding}        = ($roOption)    ? $roOption    : $rounding_method;
+	$gffTypes{$type}{label}           = ($labOption)   ? $labOption   : $type;
+	$gffTypes{$type}{count}           = ($countOption) ? $countOption : 0;
+	$gffTypes{$type}{countColorScale} = ($ccsOption)   ? $ccsOption   : $colour_scale_count;
+	$gffTypes{$type}{countSteps}      = ($countSteps)  ? $countSteps  : 5;
 	
 	if ($strandOption eq "-" or $strandOption eq "+" or $strandOption eq "fused"){
 		$gffTypes{$type}{Nstrand} = 1;
@@ -327,7 +345,7 @@ while (<COLOR>) {
 }
 close COLOR;
 
-open(COLOR, "<".dirname(abs_path($0))."/colors/count_colors2.txt") or die "Can not open ".dirname(abs_path($0))."/count_colors.txt";
+open(COLOR, "<".dirname(abs_path($0))."/colors/count_colors2.txt") or die "Can not open ".dirname(abs_path($0))."/count_colors2.txt";
 while (<COLOR>) {
 	next if /^#/;
 	chomp;
@@ -569,16 +587,17 @@ sub processData{
 		foreach my $strand (split(";", $order{$gffTypes{$type}{'strand'}})){
 			printd("processData: strand = $strand");
 			
-			my $cs = $gffTypes{$type}{colour};
-			my $ro = $gffTypes{$type}{rounding};
-			my $la = $gffTypes{$type}{label};
+			my $cs  = $gffTypes{$type}{colour};
+			my $ccs = $gffTypes{$type}{countColorScale};
+			my $ro  = $gffTypes{$type}{rounding};
+			my $la  = $gffTypes{$type}{label};
 			my $ref_tab;
 			
 			if    ($strand eq "-") {$ref_tab =\@minus;}
 			elsif ($strand eq "+") {$ref_tab =\@plus;}
 			elsif ($strand eq "-+"){$ref_tab =\@minusPlus;}
 			
-			drawPixels(\$image, \%rand, $cs, $chr, $region{$chr}{length}, $scale_factor,
+			drawPixels(\$image, \%rand, $cs, $ccs, $chr, $region{$chr}{length}, $scale_factor,
 					   $type, $strand, $strand, \%centromere, $ref_tab, $win_size, $ro, $la);
 			
 			$offset{x} += $strand_width;
@@ -639,7 +658,7 @@ sub removeIntervalRedundancy{
 		
 		#Load first interval
 		if ($bool_firstInterval) {
-			print "\nLoad first interval\n"                                     if $config{'insaneDebugMode'};
+			print "\nLoad first interval\n"                                     if $config{insaneDebugMode};
 			
 			push(@reduced_gff, [$annot->[1], $annot->[2]]);
 			$bool_firstInterval--;
@@ -657,7 +676,7 @@ sub removeIntervalRedundancy{
 			$reduced_gff[$#reduced_gff]->[1] = $annot->[2];
 		}
 		elsif ($annot->[1] <= $reduced_gff[$#reduced_gff]->[1] and  #2
-			   $annot->[2] <=  $reduced_gff[$#reduced_gff]->[1]) {
+			   $annot->[2] <= $reduced_gff[$#reduced_gff]->[1]) {
 			# Go to next interval
 			next;
 		}
@@ -799,7 +818,7 @@ sub drawPixels{
 	printd("===> Start Drawing pixels ...");
 	printd("drawPixels: ");
 	
-	my ($ref_img, $ref_rand, $cs, $seqName, $chr_size,$scaleFactor, $type,
+	my ($ref_img, $ref_rand, $cs, $ccs, $seqName, $chr_size,$scaleFactor, $type,
 		$strand, $strandColor, $ref_centromere, $ref_gff, $win_size, $ro, $la) = @_;
 	my @gff    = @{$ref_gff};
 	my %centro = %{$ref_centromere};
@@ -826,13 +845,6 @@ sub drawPixels{
 	# Open label group for next rotation 
 	$$ref_img->startGroup("rotate_$randNum");
 	
-	# Draw label Sequence Name
-	#$$ref_img->string(
-	#	gdLargeFont,
-	#	$offset{x} + (($strand_width/2) - (length($seqName) * gdLargeFont->width)/2), 
-	#	$offset{y} - (3 * gdLargeFont->height), 
-	#	$seqName,
-	#	$color{'black'});
 	
 	# Draw label type
 	$$ref_img->string(
@@ -852,14 +864,13 @@ sub drawPixels{
 		$strand,
 		$color{'black'});
 	
-	
 	# Drawing chromosomes windows
 	if ($gffTypes{$type}{count}){
 		# Draw Chromosome background
 		$$ref_img->filledRectangle(
-		$offset{x}                , $offset{y} + ($region{$seqName}{start}/$scale_factor),
-		$offset{x} + $strand_width, $offset{y} + ($region{$seqName}{end}  /$scale_factor),
-		$color{"count_${cs}"}->[0]);
+			$offset{x}                , $offset{y} + ($region{$seqName}{start}/$scale_factor),
+			$offset{x} + $strand_width, $offset{y} + ($region{$seqName}{end}  /$scale_factor),
+			$color{"count_${cs}"}->[0]);
 		
 		printd("drawPixels: Counting ...");
 		while (my $refInterval = shift @gff){
@@ -870,28 +881,29 @@ sub drawPixels{
 		}
 		printd("drawPixels: Finish Counting ...");
 		
-		my @minMax = minmax values %covBases;
-		my $colour_scale_factor;
-		
-		printd("Searching color scale factor");
-		if    ($minMax[1]   < 9){$colour_scale_factor = 1;}
-		elsif ($minMax[1]/2 < 9){$colour_scale_factor = 2;}
-		else {
-			$colour_scale_factor = 5;
-			while (1){
-				if ($minMax[1]/$colour_scale_factor < 9){last;}
-				$colour_scale_factor += 5;
-			}
-		}
-		printd("Found color scale factor: $colour_scale_factor");
+# 		my @minMax = minmax values %covBases;
+# 		my $colour_scale_factor;
+# 		
+# 		printd("Searching color scale factor");
+# 		if    ($minMax[1]   < 9){$colour_scale_factor = 1;}
+# 		elsif ($minMax[1]/2 < 9){$colour_scale_factor = 2;}
+# 		else {
+# 			$colour_scale_factor = 5;
+# 			while (1){
+# 				if ($minMax[1]/$colour_scale_factor < 9){last;}
+# 				$colour_scale_factor += 5;
+# 			}
+# 		}
+# 		printd("Found color scale factor: $colour_scale_factor");
 		
 		for my $pos (sortedKeys(\%covBases)){
-			my $color = int($covBases{$pos}/$colour_scale_factor)+1;
+			my $color = int($covBases{$pos}/$gffTypes{$type}{countSteps})+1;
+			$color = ($color > 10) ? 10 : $color;
 			
 			$$ref_img->filledRectangle(
 				$offset{x}                , $offset{y} + $pos * $win_size,
 				$offset{x} + $strand_width, $offset{y} + $pos * $win_size + $win_size,
-				$color{"count_${cs}"}->[$color]);
+				$color{"count_${ccs}"}->[$color]);
 			
 			my $st = $pos * $scaleFactor;
 			my $en = $pos * $scaleFactor + $scaleFactor;
@@ -955,9 +967,9 @@ sub drawPixels{
 		
 		#Right Triangle
 		$poly = new GD::Polygon;
-		$poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{start}/$scaleFactor));
-		$poly->addPt($offset{x} + $strand_width + 1, ($offset{y} + $$ref_centromere{end}  /$scaleFactor));
-		$poly->addPt(($offset{x} + $strand_width/2), ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
+		$poly->addPt( $offset{x} + $strand_width + 1, ($offset{y} +  $$ref_centromere{start}/$scaleFactor));
+		$poly->addPt( $offset{x} + $strand_width + 1, ($offset{y} +  $$ref_centromere{end}  /$scaleFactor));
+		$poly->addPt(($offset{x} + $strand_width/2) , ($offset{y} + ($$ref_centromere{start}/$scaleFactor + $$ref_centromere{end}/$scaleFactor)/2));
 		$$ref_img->filledPolygon($poly, $color{$config{'background'}});
 	}
 	
@@ -1166,10 +1178,11 @@ Generic options:
     -h      | help                  [booleen]    This help
 
 Density options: 
-    -c      | colour_scale          [integer]    Color scale to use    (Default = 7)
+    -co     | colour_scale          [integer]    Color scale to use       (applied to all DensityMap) (Default = 7)
+    -ccs    | ccs                   [integer]    Count color scale to use (applied to all DensityMap) (Default = 7)
     -sc     | scale_factor          [integer]    = window length in bp (Default = 1000)
     -a      | auto_scale_factor     [integer]    Max picture height in pixel
-    -ro     | rounding_method       [string      floor or ceil         (Default = floor)
+    -ro     | rounding_method       [string]     floor or ceil         (Default = floor)
     -gc     | gc                    [integer]    if set, add a density map of the GC% (fasta option must be set)
 
 Graphical options:
