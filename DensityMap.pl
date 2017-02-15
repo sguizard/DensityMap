@@ -1180,9 +1180,9 @@ Generic options:
 Density options: 
     -co     | colour_scale          [integer]    Color scale to use       (applied to all DensityMap) (Default = 7)
     -ccs    | ccs                   [integer]    Count color scale to use (applied to all DensityMap) (Default = 7)
-    -sc     | scale_factor          [integer]    = window length in bp (Default = 1000)
+    -sc     | scale_factor          [integer]    = window length in bp    (Default = 1000)
     -a      | auto_scale_factor     [integer]    Max picture height in pixel
-    -ro     | rounding_method       [string]     floor or ceil         (Default = floor)
+    -ro     | rounding_method       [string]     floor or ceil            (Default = floor)
     -gc     | gc                    [integer]    if set, add a density map of the GC% (fasta option must be set)
 
 Graphical options:
