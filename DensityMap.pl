@@ -187,7 +187,7 @@ my $switchInitFasta = 0;
 
 while (<GFF>) {
     chomp;
-    if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
+    if (/##sequence-region\s+(\S+)\s+\d+\s+(\d+)/) {
         $numOfGff++;
         $initHeadSeq = $1;
         $listChr{$initHeadSeq}{length} = $2;
@@ -364,7 +364,7 @@ open(CSV, ">$csv") or die "Can not open $csv ! ";
 print CSV "sequence\tfeature\tstart\tend\tdensity\n";
 
 while (<GFF>) {
-    if (/##sequence-region\s+(\S+)\s+1\s+(\d+)/) {
+    if (/##sequence-region\s+(\S+)\s+\d+\s+(\d+)/) {
         if ($switchFirstSetLoaded){
             processData();
             $countGff++;
